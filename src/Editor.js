@@ -1,6 +1,6 @@
-import React, { useReducer, useRef, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useRef, useEffect } from 'react';
 import { HotKeys } from "react-hotkeys";
-import { initialState, reducer } from './EditReducer';
+import { initialState, reducer, nodeFromPath } from './EditReducer';
 import './Editor.css';
 
 const keyMap = {
@@ -18,22 +18,32 @@ const keyMap = {
   CANCEL_EDIT: "escape",
 };
 
+const SelectedNodeContext = createContext();
+function useWithSelectedClass(obj, cns = '') {
+  const selectedNode = useContext(SelectedNodeContext);
+  return (obj === selectedNode) ? (cns + ' Editor-selected') : cns;
+}
+
 function ProgramView({ program }) {
   return (
     <div>
       {program.assignments.map((assignment) => (
-        <AssignmentView assignment={assignment} key={assignment.identifier} />
+        <AssignmentView assignment={assignment} key={assignment.identifier.name} />
       ))}
     </div>
   );
 }
 
 function AssignmentView({ assignment }) {
-  return <div>{assignment.identifier} = {assignment.expression.value}</div>
+  return <div><span className={useWithSelectedClass(assignment)}><IdentifierView identifier={assignment.identifier} /> = {assignment.expression.value}</span></div>
+}
+
+function IdentifierView({ identifier }) {
+  return <span className={useWithSelectedClass(identifier)}>{identifier.name}</span>
 }
 
 export default function Editor() {
-  const [docsel, dispatch] = useReducer(reducer, initialState);
+  const [state, dispatch] = useReducer(reducer, initialState);
 
   const editorElem = useRef();
   useEffect(() => {
@@ -65,7 +75,9 @@ export default function Editor() {
   return (
     <HotKeys keyMap={keyMap} handlers={handlers}>
       <div className="Editor" onKeyDown={onKeyDown} tabIndex="0" ref={editorElem}>
-        <ProgramView program={docsel.doc} />
+        <SelectedNodeContext.Provider value={nodeFromPath(state.root, state.selectionPath)}>
+          <ProgramView program={state.root} />
+        </SelectedNodeContext.Provider>
       </div>
     </HotKeys>
   );

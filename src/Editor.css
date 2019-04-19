@@ -2,3 +2,12 @@
   border: 1px solid #aaa;
   padding: 1em;
 }
+
+.Editor:focus {
+  outline-style: none;
+  box-shadow: none;
+}
+
+.Editor:focus .Editor-selected {
+  outline: red solid 1px;
+}
