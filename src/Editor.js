@@ -35,11 +35,15 @@ function ProgramView({ program }) {
 }
 
 function AssignmentView({ assignment }) {
-  return <div><span className={useWithSelectedClass(assignment)}><IdentifierView identifier={assignment.identifier} /> = {assignment.expression.value}</span></div>
+  return <div><span className={useWithSelectedClass(assignment)}><IdentifierView identifier={assignment.identifier} /> = <ExpressionView expression={assignment.expression} /></span></div>
 }
 
 function IdentifierView({ identifier }) {
   return <span className={useWithSelectedClass(identifier)}>{identifier.name}</span>
+}
+
+function ExpressionView({ expression }) {
+  return <span className={useWithSelectedClass(expression)}>{expression.value}</span>
 }
 
 export default function Editor() {
@@ -54,7 +58,7 @@ export default function Editor() {
   // TODO: memoize generation of this
   const handlers = {};
   for (const k of Object.keys(keyMap)) {
-    handlers[k] = (() => () => { dispatch({type: 'cmd', cmd: k}) })(); // IIFE to bind k
+    handlers[k] = (() => () => { dispatch({type: k}) })(); // IIFE to bind k
   }
 
   const onKeyDown = e => {
@@ -66,7 +70,7 @@ export default function Editor() {
     // (https://www.w3.org/TR/uievents-key/#keys-whitespace)
     if (([...e.key].length === 1) && !e.altkey && !e.ctrlKey && !e.metaKey) {
       dispatch({
-        type: 'char',
+        type: 'CHAR',
         char: e.key,
       });
     }
