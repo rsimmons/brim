@@ -71,13 +71,17 @@ const equiv = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 const HANDLERS = [
   ['Assignment', ['MOVE_LEFT'], (node, subpath, action) => {
-    if (equiv(subpath, ['expression'])) {
+    if (subpath.length === 0) {
+      return [node, ['identifier']]; // shrink to left
+    } else if (equiv(subpath, ['expression'])) {
       return [node, ['identifier']];
     }
   }],
 
   ['Assignment', ['MOVE_RIGHT'], (node, subpath, action) => {
-    if (equiv(subpath, ['identifier'])) {
+    if (subpath.length === 0) {
+      return [node, ['expression']]; // shrink to right
+    } else if (equiv(subpath, ['identifier'])) {
       return [node, ['expression']];
     }
   }],
@@ -89,12 +93,18 @@ const HANDLERS = [
   }],
 
   ['Program', ['MOVE_UP', 'MOVE_DOWN'], (node, subpath, action) => {
-    if ((subpath.length === 2) && (subpath[0] === 'assignments')) {
-      const idx = subpath[1];
-      let newIdx = idx + ((action.type === 'MOVE_UP') ? -1 : 1);
+    // NOTE: This assumes that selection is on/in one of the assignments
+    const newAssignmentIdx = () => {
+      let newIdx = subpath[1] + ((action.type === 'MOVE_UP') ? -1 : 1);
       newIdx = Math.max(newIdx, 0);
       newIdx = Math.min(newIdx, node.assignments.length-1);
-      return [node, ['assignments', newIdx]];
+      return newIdx;
+    }
+
+    if ((subpath.length === 2) && (subpath[0] === 'assignments')) {
+      return [node, ['assignments', newAssignmentIdx()]];
+    } else if ((subpath.length === 3) && (subpath[0] === 'assignments')) {
+      return [node, ['assignments', newAssignmentIdx(), subpath[2]]];
     }
   }],
 ];
