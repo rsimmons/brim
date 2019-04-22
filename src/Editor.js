@@ -60,18 +60,30 @@ function TextEditInput() {
   return <input className="Editor-text-edit-input Editor-selected" value={textEdit.text} onChange={onChange} autoFocus />
 }
 
+function Hole() {
+  return <span className="Editor-hole">&nbsp;</span>
+}
+
 function ProgramView({ program }) {
   return (
     <div>
       {program.assignments.map((assignment) => (
-        <AssignmentView assignment={assignment} key={assignment.identifier.name} />
+        <AssignmentView assignment={assignment} key={assignment.uid} />
       ))}
     </div>
   );
 }
 
 function AssignmentView({ assignment }) {
-  return <div><span className={useWithSelectedClass(assignment)}><IdentifierView identifier={assignment.identifier} /> = <ExpressionView expression={assignment.expression} /></span></div>
+  return (
+    <div>
+      <span className={useWithSelectedClass(assignment)}>
+        <IdentifierView identifier={assignment.identifier} />
+        {' = '}
+        <ExpressionView expression={assignment.expression} />
+      </span>
+    </div>
+  );
 }
 
 function IdentifierView({ identifier }) {
@@ -80,7 +92,14 @@ function IdentifierView({ identifier }) {
   if (selected && textEdit) {
     return <TextEditInput />
   } else {
-    return <span className={useWithSelectedClass(identifier)}>{identifier.name}</span>
+    return (
+      <span className={useWithSelectedClass(identifier)}>
+        {(typeof identifier.name === 'string')
+          ? identifier.name
+          : <Hole />
+        }
+      </span>
+    );
   }
 }
 

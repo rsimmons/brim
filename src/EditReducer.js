@@ -1,3 +1,5 @@
+import genuid from './uid';
+
 const SCHEMA = {
   Program: {
     fields: {
@@ -7,6 +9,7 @@ const SCHEMA = {
 
   Assignment: {
     fields: {
+      uid: {type: 'uid'},
       identifier: {type: 'node', nodeType: 'Identifier'},
       expression: {type: 'node', nodeType: 'Integer'},
     }
@@ -72,7 +75,7 @@ const equiv = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const HANDLERS = [
   ['Assignment', ['MOVE_LEFT'], ({node, subpath}) => {
     if (subpath.length === 0) {
-      return [node, ['identifier']]; // shrink to left
+      return [node, ['identifier'], null]; // shrink to left
     } else if (equiv(subpath, ['expression'])) {
       return [node, ['identifier'], null];
     }
@@ -80,7 +83,7 @@ const HANDLERS = [
 
   ['Assignment', ['MOVE_RIGHT'], ({node, subpath}) => {
     if (subpath.length === 0) {
-      return [node, ['expression']]; // shrink to right
+      return [node, ['expression'], null]; // shrink to right
     } else if (equiv(subpath, ['identifier'])) {
       return [node, ['expression'], null];
     }
@@ -123,16 +126,16 @@ const HANDLERS = [
     if (textEdit) {
       return [{
         ...node,
-        name: textEdit.text,
+        name: textEdit.text ? textEdit.text : null, // TODO: ensure that it's valid?
       }, subpath, null];
     } else {
-      return [node, subpath, {text: node.name}];
+      return [node, subpath, {text: node.name || ''}];
     }
   }],
 ];
 
 /**
- * Returns null or [newNode, newSelectionPath, newTextEntry]
+ * Returns null or [newNode, newSelectionPath, newTextEdit]
  */
 function recursiveReducer(state, node, action) {
   // If this node is not on the selection path, we can short circuit
@@ -150,7 +153,7 @@ function recursiveReducer(state, node, action) {
     type: node.type,
   };
   let newSelPath = null;
-  let newTextEntry = null;
+  let newTextEdit = null;
   let handled = false;
   for (const [fieldName, fieldInfo] of Object.entries(nodeSchema.fields)) {
     switch (fieldInfo.type) {
@@ -163,7 +166,7 @@ function recursiveReducer(state, node, action) {
           const [n, sp, te] = recResult;
           newNode[fieldName] = n;
           newSelPath = sp;
-          newTextEntry = te;
+          newTextEdit = te;
           handled = true;
         } else {
           newNode[fieldName] = node[fieldName];
@@ -182,7 +185,7 @@ function recursiveReducer(state, node, action) {
             const [n, sp, te] = recResult;
             newArr.push(n);
             newSelPath = sp;
-            newTextEntry = te;
+            newTextEdit = te;
             handled = true;
           } else {
             newArr.push(arrn);
@@ -196,6 +199,10 @@ function recursiveReducer(state, node, action) {
         newNode[fieldName] = node[fieldName];
         break;
 
+      case 'uid':
+        newNode[fieldName] = node[fieldName];
+        break;
+
       default:
         throw new Error();
     }
@@ -203,7 +210,7 @@ function recursiveReducer(state, node, action) {
 
   // If the action has been handled, we can return now
   if (handled) {
-    return [newNode, newSelPath, newTextEntry];
+    return [newNode, newSelPath, newTextEdit];
   }
 
   // Try any matching handlers
@@ -217,8 +224,8 @@ function recursiveReducer(state, node, action) {
         textEdit: state.textEdit,
       });
       if (handlerResult) {
-        const [handlerNewNode, handlerNewSubpath, handlerTextEntry] = handlerResult;
-        return [handlerNewNode, pathBefore.concat(handlerNewSubpath), handlerTextEntry];
+        const [handlerNewNode, handlerNewSubpath, handlerTextEdit] = handlerResult;
+        return [handlerNewNode, pathBefore.concat(handlerNewSubpath), handlerTextEdit];
       }
     }
   }
@@ -247,12 +254,12 @@ export function reducer(state, action) {
   const recResult = recursiveReducer(state, state.root, action);
   if (recResult) {
     console.log('handled');
-    const [newRoot, newSelectionPath, newTextEntry] = recResult;
-    console.log('new textEdit is', newTextEntry);
+    const [newRoot, newSelectionPath, newTextEdit] = recResult;
+    console.log('new selectionPath is', newSelectionPath, 'textEdit is', newTextEdit);
     return {
       root: newRoot,
       selectionPath: newSelectionPath,
-      textEdit: newTextEntry,
+      textEdit: newTextEdit,
     };
   } else {
     console.log('not handled');
@@ -270,6 +277,7 @@ export const initialState = {
     assignments: [
       {
         type: 'Assignment',
+        uid: genuid(),
         identifier: {
           type: 'Identifier',
           name: 'foo',
@@ -281,6 +289,7 @@ export const initialState = {
       },
       {
         type: 'Assignment',
+        uid: genuid(),
         identifier: {
           type: 'Identifier',
           name: 'bar',
@@ -292,6 +301,7 @@ export const initialState = {
       },
       {
         type: 'Assignment',
+        uid: genuid(),
         identifier: {
           type: 'Identifier',
           name: 'baz',
@@ -299,6 +309,18 @@ export const initialState = {
         expression: {
           type: 'Integer',
           value: 789,
+        }
+      },
+      {
+        type: 'Assignment',
+        uid: genuid(),
+        identifier: {
+          type: 'Identifier',
+          name: null,
+        },
+        expression: {
+          type: 'Integer',
+          value: 4321,
         }
       },
     ]
