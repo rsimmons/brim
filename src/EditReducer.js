@@ -70,29 +70,29 @@ export function nodeSplitPath(node, root, path) {
 const equiv = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 const HANDLERS = [
-  ['Assignment', ['MOVE_LEFT'], (node, subpath, action) => {
+  ['Assignment', ['MOVE_LEFT'], ({node, subpath}) => {
     if (subpath.length === 0) {
       return [node, ['identifier']]; // shrink to left
     } else if (equiv(subpath, ['expression'])) {
-      return [node, ['identifier']];
+      return [node, ['identifier'], null];
     }
   }],
 
-  ['Assignment', ['MOVE_RIGHT'], (node, subpath, action) => {
+  ['Assignment', ['MOVE_RIGHT'], ({node, subpath}) => {
     if (subpath.length === 0) {
       return [node, ['expression']]; // shrink to right
     } else if (equiv(subpath, ['identifier'])) {
-      return [node, ['expression']];
+      return [node, ['expression'], null];
     }
   }],
 
-  ['Assignment', ['EXPAND'], (node, subpath, action) => {
+  ['Assignment', ['EXPAND'], ({node, subpath}) => {
     if (subpath.length === 1) {
-      return [node, []];
+      return [node, [], null];
     }
   }],
 
-  ['Program', ['MOVE_UP', 'MOVE_DOWN'], (node, subpath, action) => {
+  ['Program', ['MOVE_UP', 'MOVE_DOWN'], ({node, subpath, action}) => {
     // NOTE: This assumes that selection is on/in one of the assignments
     const newAssignmentIdx = () => {
       let newIdx = subpath[1] + ((action.type === 'MOVE_UP') ? -1 : 1);
@@ -101,16 +101,38 @@ const HANDLERS = [
       return newIdx;
     }
 
+    if (((subpath.length === 2) || (subpath.length === 3)) && (subpath[0] === 'assignments')) {
+      return [node, ['assignments', newAssignmentIdx()], null];
+    }
+  }],
+
+  ['Program', ['DELETE'], ({node, subpath}) => {
     if ((subpath.length === 2) && (subpath[0] === 'assignments')) {
-      return [node, ['assignments', newAssignmentIdx()]];
-    } else if ((subpath.length === 3) && (subpath[0] === 'assignments')) {
-      return [node, ['assignments', newAssignmentIdx(), subpath[2]]];
+      // TODO: Handle case where we delete the last assignment
+      const removeIdx = subpath[1];
+      const newNode = {
+        ...node,
+        assignments: node.assignments.slice(0, removeIdx).concat(node.assignments.slice(removeIdx+1)),
+      };
+      const newIdx = Math.min(removeIdx, newNode.assignments.length-1);
+      return [newNode, ['assignments', newIdx], null];
+    }
+  }],
+
+  ['Identifier', ['ENTER'], ({node, subpath, textEdit}) => {
+    if (textEdit) {
+      return [{
+        ...node,
+        name: textEdit.text,
+      }, subpath, null];
+    } else {
+      return [node, subpath, {text: node.name}];
     }
   }],
 ];
 
 /**
- * Returns null or [newNode, newSelectionPath]
+ * Returns null or [newNode, newSelectionPath, newTextEntry]
  */
 function recursiveReducer(state, node, action) {
   // If this node is not on the selection path, we can short circuit
@@ -128,6 +150,7 @@ function recursiveReducer(state, node, action) {
     type: node.type,
   };
   let newSelPath = null;
+  let newTextEntry = null;
   let handled = false;
   for (const [fieldName, fieldInfo] of Object.entries(nodeSchema.fields)) {
     switch (fieldInfo.type) {
@@ -137,9 +160,10 @@ function recursiveReducer(state, node, action) {
           if (handled) {
             throw new Error('already handled');
           }
-          const [n, sp] = recResult;
+          const [n, sp, te] = recResult;
           newNode[fieldName] = n;
           newSelPath = sp;
+          newTextEntry = te;
           handled = true;
         } else {
           newNode[fieldName] = node[fieldName];
@@ -155,9 +179,10 @@ function recursiveReducer(state, node, action) {
             if (handled) {
               throw new Error('already handled');
             }
-            const [n, sp] = recResult;
+            const [n, sp, te] = recResult;
             newArr.push(n);
             newSelPath = sp;
+            newTextEntry = te;
             handled = true;
           } else {
             newArr.push(arrn);
@@ -178,17 +203,22 @@ function recursiveReducer(state, node, action) {
 
   // If the action has been handled, we can return now
   if (handled) {
-    return [newNode, newSelPath];
+    return [newNode, newSelPath, newTextEntry];
   }
 
   // Try any matching handlers
   for (const [nt, acts, hfunc] of HANDLERS) {
     if ((node.type === nt) && (acts.includes(action.type))) {
       const [pathBefore, pathAfter] = nodeSplitPath(node, state.root, state.selectionPath);
-      const handlerResult = hfunc(node, pathAfter, action);
+      const handlerResult = hfunc({
+        node,
+        subpath: pathAfter,
+        action,
+        textEdit: state.textEdit,
+      });
       if (handlerResult) {
-        const [handlerNewNode, handlerNewSubpath] = handlerResult;
-        return [handlerNewNode, pathBefore.concat(handlerNewSubpath)];
+        const [handlerNewNode, handlerNewSubpath, handlerTextEntry] = handlerResult;
+        return [handlerNewNode, pathBefore.concat(handlerNewSubpath), handlerTextEntry];
       }
     }
   }
@@ -199,13 +229,30 @@ function recursiveReducer(state, node, action) {
 export function reducer(state, action) {
   console.log('action', action.type);
 
+  // Some actions are handled specially
+  if (action.type === 'SET_TEXT') {
+    if (!state.textEdit) {
+      throw new Error();
+    }
+
+    return {
+      ...state,
+      textEdit: {
+        ...state.textEdit,
+        text: action.text,
+      }
+    };
+  }
+
   const recResult = recursiveReducer(state, state.root, action);
   if (recResult) {
     console.log('handled');
-    const [newRoot, newSelectionPath] = recResult;
+    const [newRoot, newSelectionPath, newTextEntry] = recResult;
+    console.log('new textEdit is', newTextEntry);
     return {
       root: newRoot,
       selectionPath: newSelectionPath,
+      textEdit: newTextEntry,
     };
   } else {
     console.log('not handled');
@@ -257,4 +304,5 @@ export const initialState = {
     ]
   },
   selectionPath: ['assignments', 0, 'identifier'],
+  textEdit: null,
 };

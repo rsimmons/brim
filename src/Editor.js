@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useRef, useEffect } from 'react';
-import { HotKeys } from "react-hotkeys";
+import { HotKeys, ObserveKeys } from "react-hotkeys";
 import { initialState, reducer, nodeFromPath } from './EditReducer';
 import './Editor.css';
 
@@ -10,18 +10,54 @@ const keyMap = {
   MOVE_RIGHT: "right",
 
   EXPAND: "shift+left",
+
+  ENTER: "enter", // since this has multiple functions based on context, not sure how else to name
+  SHIFT_ENTER: "shift+enter", // don't know how to name this either
+
+  DELETE: "Backspace",
+
+/*
   SHRINK: "shift+right",
   EXTEND_PREV: "shift+up",
   EXTEND_NEXT: "shift+down",
-
-  BEGIN_EDIT: "enter",
   CANCEL_EDIT: "escape",
+*/
 };
+
+const COMMANDS_OBSERVED_IN_INPUTS = [
+  "ENTER",
+  // "ESCAPE",
+];
+
+const KEYS_OBSERVED_IN_INPUTS = COMMANDS_OBSERVED_IN_INPUTS.map(cmd => {
+  if (!keyMap.hasOwnProperty(cmd)) {
+    throw new Error();
+  }
+  return keyMap[cmd];
+});
+
+const DispatchContext = createContext();
 
 const SelectedNodeContext = createContext();
 function useWithSelectedClass(obj, cns = '') {
   const selectedNode = useContext(SelectedNodeContext);
   return (obj === selectedNode) ? (cns + ' Editor-selected') : cns;
+}
+
+const TextEditContext = createContext();
+
+function TextEditInput() {
+  const dispatch = useContext(DispatchContext);
+  const textEdit = useContext(TextEditContext);
+
+  const onChange = e => {
+    dispatch({
+      type: 'SET_TEXT',
+      text: e.target.value,
+    });
+  };
+
+  return <input className="Editor-text-edit-input Editor-selected" value={textEdit.text} onChange={onChange} autoFocus />
 }
 
 function ProgramView({ program }) {
@@ -39,21 +75,42 @@ function AssignmentView({ assignment }) {
 }
 
 function IdentifierView({ identifier }) {
-  return <span className={useWithSelectedClass(identifier)}>{identifier.name}</span>
+  const selected = (identifier === useContext(SelectedNodeContext));
+  const textEdit = useContext(TextEditContext);
+  if (selected && textEdit) {
+    return <TextEditInput />
+  } else {
+    return <span className={useWithSelectedClass(identifier)}>{identifier.name}</span>
+  }
 }
 
 function ExpressionView({ expression }) {
   return <span className={useWithSelectedClass(expression)}>{expression.value}</span>
 }
 
-export default function Editor() {
+export default function Editor({ autoFocus }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
   const editorElem = useRef();
+
+  // Do auto-focus if prop is set
   useEffect(() => {
-    // Focus editor after initial render
-    editorElem.current.focus();
+    if (autoFocus) {
+      // Focus editor after initial render
+      editorElem.current.focus();
+    }
   }, []);
+
+  // Restore focus to editor elem if input box just went away.
+  // NOTE: This is hacky, but don't know better way to handle.
+  const previouslyTextEditing = useRef(false);
+  useEffect(() => {
+    const textEditing = !!state.textEdit;
+    if (previouslyTextEditing.current && !textEditing) {
+      editorElem.current.focus();
+    }
+    previouslyTextEditing.current = textEditing;
+  });
 
   // TODO: memoize generation of this
   const handlers = {};
@@ -78,11 +135,17 @@ export default function Editor() {
 
   return (
     <HotKeys keyMap={keyMap} handlers={handlers}>
-      <div className="Editor" onKeyDown={onKeyDown} tabIndex="0" ref={editorElem}>
-        <SelectedNodeContext.Provider value={nodeFromPath(state.root, state.selectionPath)}>
-          <ProgramView program={state.root} />
-        </SelectedNodeContext.Provider>
-      </div>
+      <ObserveKeys only={KEYS_OBSERVED_IN_INPUTS}>
+        <div className="Editor" onKeyDown={onKeyDown} tabIndex="0" ref={editorElem}>
+          <DispatchContext.Provider value={dispatch}>
+            <SelectedNodeContext.Provider value={nodeFromPath(state.root, state.selectionPath)}>
+              <TextEditContext.Provider value={state.textEdit}>
+                <ProgramView program={state.root} />
+              </TextEditContext.Provider>
+            </SelectedNodeContext.Provider>
+          </DispatchContext.Provider>
+        </div>
+      </ObserveKeys>
     </HotKeys>
   );
 }
