@@ -104,7 +104,29 @@ function IdentifierView({ identifier }) {
 }
 
 function ExpressionView({ expression }) {
-  return <span className={useWithSelectedClass(expression)}>{expression.value}</span>
+  const selected = (expression === useContext(SelectedNodeContext));
+  const textEdit = useContext(TextEditContext);
+
+  if (selected && textEdit) {
+    return <TextEditInput />
+  } else {
+    return (
+      <span className={useWithSelectedClass(expression)}>
+        {(() => {
+          switch (expression.type) {
+            case 'IntegerLiteral':
+              return expression.value;
+
+            case 'UndefinedExpression':
+              return <Hole />
+
+            default:
+              throw new Error();
+          }
+        })()}
+      </span>
+    );
+  }
 }
 
 export default function Editor({ autoFocus }) {

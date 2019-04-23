@@ -1,6 +1,6 @@
 import genuid from './uid';
 
-const SCHEMA = {
+const SCHEMA_NODES = {
   Program: {
     fields: {
       assignments: {type: 'nodes', nodeType: 'Assignment'},
@@ -11,7 +11,7 @@ const SCHEMA = {
     fields: {
       uid: {type: 'uid'},
       identifier: {type: 'node', nodeType: 'Identifier'},
-      expression: {type: 'node', nodeType: 'Integer'},
+      expression: {type: 'node', nodeType: 'Expression'},
     }
   },
 
@@ -21,12 +21,22 @@ const SCHEMA = {
     }
   },
 
-  Integer: {
+  UndefinedExpression: {
+    fields: {
+    }
+  },
+
+  IntegerLiteral: {
     fields: {
       value: {type: 'value'},
     }
   },
 };
+
+// TODO: If we want to include other classes in the lists, generate an expansion over the closure
+const SCHEMA_CLASSES = {
+  Expression: ['UndefinedExpression', 'IntegerLiteral'],
+}
 
 export function nodeFromPath(root, path) {
   let cur = root;
@@ -115,9 +125,14 @@ const HANDLERS = [
       const removeIdx = subpath[1];
       const newNode = {
         ...node,
-        assignments: node.assignments.slice(0, removeIdx).concat(node.assignments.slice(removeIdx+1)),
+        assignments: [
+          ...node.assignments.slice(0, removeIdx),
+          ...node.assignments.slice(removeIdx+1),
+        ],
       };
-      const newIdx = Math.min(removeIdx, newNode.assignments.length-1);
+      let newIdx = removeIdx-1;
+      newIdx = Math.max(newIdx, 0);
+      newIdx = Math.min(newIdx, node.assignments.length-1);
       return [newNode, ['assignments', newIdx], null];
     }
   }],
@@ -130,6 +145,60 @@ const HANDLERS = [
       }, subpath, null];
     } else {
       return [node, subpath, {text: node.name || ''}];
+    }
+  }],
+
+  ['Expression', ['ENTER'], ({node, subpath, textEdit}) => {
+    if (textEdit) {
+      const FLOAT_REGEX = /^[-+]?(?:\d*\.?\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?$/;
+
+      if (FLOAT_REGEX.test(textEdit.text)) {
+        return [{
+          type: 'IntegerLiteral',
+          value: Number(textEdit.text),
+        }, [], null];
+      } else {
+        return [{
+          type: 'UndefinedExpression',
+        }, [], null];
+      }
+    } else {
+      // Initialize the input
+      switch (node.type) {
+        case 'IntegerLiteral':
+          return [node, subpath, {text: node.value.toString()}];
+
+        case 'UndefinedExpression':
+          return [node, subpath, {text: ''}];
+
+        default:
+          throw new Error();
+      }
+    }
+  }],
+
+  ['Program', ['ENTER'], ({node, subpath}) => {
+    if ((subpath.length === 2) && (subpath[0] === 'assignments')) {
+      const afterIdx = subpath[1];
+      const newNode = {
+        ...node,
+        assignments: [
+          ...node.assignments.slice(0, afterIdx+1),
+          {
+            type: 'Assignment',
+            uid: genuid(),
+            identifier: {
+              type: 'Identifier',
+              name: null,
+            },
+            expression: {
+              type: 'UndefinedExpression',
+            }
+          },
+          ...node.assignments.slice(afterIdx+1),
+        ],
+      };
+      return [newNode, ['assignments', afterIdx+1, 'identifier'], null];
     }
   }],
 ];
@@ -145,8 +214,8 @@ function recursiveReducer(state, node, action) {
 
   // Build new node, recursing into any child nodes
   // If nothing has changed, we try to return the original object to allow callers to memoize
-  const nodeSchema = SCHEMA[node.type];
-  if (!nodeSchema) {
+  const nodeInfo = SCHEMA_NODES[node.type];
+  if (!nodeInfo) {
     throw new Error();
   }
   const newNode = {
@@ -155,7 +224,7 @@ function recursiveReducer(state, node, action) {
   let newSelPath = null;
   let newTextEdit = null;
   let handled = false;
-  for (const [fieldName, fieldInfo] of Object.entries(nodeSchema.fields)) {
+  for (const [fieldName, fieldInfo] of Object.entries(nodeInfo.fields)) {
     switch (fieldInfo.type) {
       case 'node': {
         const recResult = recursiveReducer(state, node[fieldName], action);
@@ -215,7 +284,8 @@ function recursiveReducer(state, node, action) {
 
   // Try any matching handlers
   for (const [nt, acts, hfunc] of HANDLERS) {
-    if ((node.type === nt) && (acts.includes(action.type))) {
+    const matchingTypes = SCHEMA_CLASSES[nt] ? SCHEMA_CLASSES[nt] : [nt];
+    if (matchingTypes.includes(node.type) && acts.includes(action.type)) {
       const [pathBefore, pathAfter] = nodeSplitPath(node, state.root, state.selectionPath);
       const handlerResult = hfunc({
         node,
@@ -224,6 +294,7 @@ function recursiveReducer(state, node, action) {
         textEdit: state.textEdit,
       });
       if (handlerResult) {
+        console.log('handlerResult', handlerResult);
         const [handlerNewNode, handlerNewSubpath, handlerTextEdit] = handlerResult;
         return [handlerNewNode, pathBefore.concat(handlerNewSubpath), handlerTextEdit];
       }
@@ -283,7 +354,7 @@ export const initialState = {
           name: 'foo',
         },
         expression: {
-          type: 'Integer',
+          type: 'IntegerLiteral',
           value: 123,
         }
       },
@@ -295,7 +366,7 @@ export const initialState = {
           name: 'bar',
         },
         expression: {
-          type: 'Integer',
+          type: 'IntegerLiteral',
           value: 456,
         }
       },
@@ -307,7 +378,7 @@ export const initialState = {
           name: 'baz',
         },
         expression: {
-          type: 'Integer',
+          type: 'IntegerLiteral',
           value: 789,
         }
       },
@@ -319,8 +390,19 @@ export const initialState = {
           name: null,
         },
         expression: {
-          type: 'Integer',
+          type: 'IntegerLiteral',
           value: 4321,
+        }
+      },
+      {
+        type: 'Assignment',
+        uid: genuid(),
+        identifier: {
+          type: 'Identifier',
+          name: 'quux',
+        },
+        expression: {
+          type: 'UndefinedExpression',
         }
       },
     ]
