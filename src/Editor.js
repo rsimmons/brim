@@ -76,7 +76,7 @@ function ProgramView({ program }) {
 
 function AssignmentView({ assignment }) {
   return (
-    <div>
+    <div className="Editor-assignment">
       <span className={useWithSelectedClass(assignment)}>
         <IdentifierView identifier={assignment.identifier} />
         {' = '}
