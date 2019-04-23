@@ -2,10 +2,12 @@ import React from 'react';
 import './App.css';
 import Editor from './Editor';
 
-export default function App() {
+const App: React.FC = () => {
   return (
     <div className="App">
       <Editor autoFocus={true} />
     </div>
   );
 }
+
+export default App;
