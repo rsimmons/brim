@@ -198,7 +198,7 @@ const HANDLERS = [
           ...node.assignments.slice(afterIdx+1),
         ],
       };
-      return [newNode, ['assignments', afterIdx+1, 'identifier'], null];
+      return [newNode, ['assignments', afterIdx+1, 'identifier'], {text: ''}];
     }
   }],
 ];
