@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useRef, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useRef, useEffect, useState } from 'react';
 import { HotKeys, ObserveKeys } from "react-hotkeys";
 import { initialState, reducer, nodeFromPath } from './EditReducer';
 import './Editor.css';
@@ -143,12 +143,13 @@ export default function Editor({ autoFocus }) {
   const editorElem = useRef();
 
   // Do auto-focus if prop is set
+  const [constAutoFocus] = useState(autoFocus);
   useEffect(() => {
-    if (autoFocus) {
+    if (constAutoFocus) {
       // Focus editor after initial render
       editorElem.current.focus();
     }
-  }, []);
+  }, [constAutoFocus]);
 
   // Restore focus to editor elem if input box just went away.
   // NOTE: This is hacky, but don't know better way to handle.
