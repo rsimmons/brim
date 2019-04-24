@@ -160,7 +160,7 @@ export function nodeSplitPath(node: Node, root: Node, path: Path): [Path, Path] 
 
 const equiv = (a: any, b: any): boolean => JSON.stringify(a) === JSON.stringify(b);
 
-function deleteAssignment(node: ProgramNode, removeIdx: number): [ProgramNode, Path, null] {
+function deleteAssignment(node: ProgramNode, removeIdx: number): [ProgramNode, Path, TextEdit | null] {
   // TODO: Handle case where we delete all assignments
   if (typeof(removeIdx) !== 'number') {
     throw new Error();
@@ -172,10 +172,27 @@ function deleteAssignment(node: ProgramNode, removeIdx: number): [ProgramNode, P
       ...node.assignments.slice(removeIdx+1),
     ],
   };
-  let newIdx = removeIdx-1;
-  newIdx = Math.max(newIdx, 0);
-  newIdx = Math.min(newIdx, node.assignments.length-1);
-  return [newNode, ['assignments', newIdx], null];
+
+  if (newNode.assignments.length) {
+    let newIdx = removeIdx-1;
+    newIdx = Math.max(newIdx, 0);
+    newIdx = Math.min(newIdx, node.assignments.length-1);
+    return [newNode, ['assignments', newIdx], null];
+  } else {
+    // We've deleted all assignments, so make a single empty one.
+    newNode.assignments.push({
+      type: 'Assignment',
+      uid: genuid(),
+      identifier: {
+        type: 'Identifier',
+        name: null,
+      },
+      expression: {
+        type: 'UndefinedExpression',
+      }
+    });
+    return [newNode, ['assignments', 0, 'identifier'], {text: '', quick: true}];
+  }
 }
 
 const HANDLERS: Handler[] = [
