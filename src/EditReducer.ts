@@ -372,7 +372,10 @@ const HANDLERS: Handler[] = [
     if (textEdit || subpath.length || !action.char) {
       throw new Error();
     }
-    return [node, subpath, {text: action.char}];
+    // Space is not a "command character", but I don't think we want it to trigger the start of editing
+    if (action.char !== ' ') {
+      return [node, subpath, {text: action.char}];
+    }
   }],
 
   /**
