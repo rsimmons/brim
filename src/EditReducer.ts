@@ -274,10 +274,7 @@ const HANDLERS: Handler[] = [
       throw new Error();
     }
     if (textEdit) {
-      return [{
-        ...node,
-        name: textEdit.text ? textEdit.text : null, // TODO: ensure that it's valid?
-      }, subpath, null];
+      return [node, subpath, null];
     } else {
       return [node, subpath, {text: node.name || ''}];
     }
@@ -285,18 +282,7 @@ const HANDLERS: Handler[] = [
 
   ['Expression', ['ENTER'], ({node, subpath, textEdit}) => {
     if (textEdit) {
-      const FLOAT_REGEX = /^[-+]?(?:\d*\.?\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?$/;
-
-      if (FLOAT_REGEX.test(textEdit.text)) {
-        return [{
-          type: 'IntegerLiteral',
-          value: Number(textEdit.text),
-        }, [], null];
-      } else {
-        return [{
-          type: 'UndefinedExpression',
-        }, [], null];
-      }
+      return [node, subpath, null];
     } else {
       // Initialize the input
       switch (node.type) {
@@ -368,6 +354,9 @@ const HANDLERS: Handler[] = [
     }
   }],
 
+  /**
+   * Typing a character on an identifier jumps straight into editing it (overwriting)
+   */
   ['Identifier', ['CHAR'], ({node, subpath, textEdit, action}) => {
     if (textEdit || subpath.length || !action.char) {
       throw new Error();
@@ -378,6 +367,9 @@ const HANDLERS: Handler[] = [
     }
   }],
 
+  /**
+   * Typing a character on an expression jumps straight into editing it (overwriting)
+   */
   ['Expression', ['CHAR'], ({node, subpath, textEdit, action}) => {
     if (textEdit || subpath.length || !action.char) {
       throw new Error();
@@ -396,6 +388,45 @@ const HANDLERS: Handler[] = [
     (textEdit && equiv(subpath, ['identifier']))) {
       return [node, ['expression'], {text: ''}];
     }
+  }],
+
+  ['Identifier', ['SET_TEXT'], ({node, subpath, textEdit, action}) => {
+    if (!textEdit) {
+      throw new Error();
+    }
+    if (typeof(action.text) !== 'string') {
+      throw new Error();
+    }
+
+    return [{
+      ...node,
+      name: action.text ? action.text : null, // TODO: ensure that it's valid?
+    }, subpath, {text: action.text}];
+  }],
+
+  ['Expression', ['SET_TEXT'], ({node, subpath, textEdit, action}) => {
+    if (!textEdit) {
+      throw new Error();
+    }
+    if (typeof(action.text) !== 'string') {
+      throw new Error();
+    }
+
+    const FLOAT_REGEX = /^[-+]?(?:\d*\.?\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?$/;
+    let newNode: Node;
+
+    if (FLOAT_REGEX.test(action.text)) {
+      newNode = {
+        type: 'IntegerLiteral',
+        value: Number(action.text),
+      };
+    } else {
+      newNode = {
+        type: 'UndefinedExpression',
+      };
+    }
+
+    return [newNode, subpath, {text: action.text}];
   }],
 ];
 
@@ -512,6 +543,7 @@ function recursiveReducer(state: State, node: Node, action: Action): (null | [No
 export function reducer(state: State, action: Action): State {
   console.log('action', action.type);
 
+/*
   // Some actions are handled specially
   if (action.type === 'SET_TEXT') {
     if (!state.textEdit) {
@@ -529,6 +561,7 @@ export function reducer(state: State, action: Action): State {
       }
     };
   }
+*/
 
   const recResult = recursiveReducer(state, state.root, action);
   if (recResult) {
