@@ -4,25 +4,31 @@ import { initialState, reducer, nodeFromPath } from './EditReducer';
 import './Editor.css';
 
 const keyMap = {
-  MOVE_UP: "up",
-  MOVE_DOWN: "down",
-  MOVE_LEFT: "left",
-  MOVE_RIGHT: "right",
+  MOVE_UP: 'up',
+  MOVE_DOWN: 'down',
+  MOVE_LEFT: 'left',
+  MOVE_RIGHT: 'right',
 
-  EXPAND: "shift+left",
+  EXPAND: 'shift+left',
 
-  ENTER: "enter", // since this has multiple functions based on context, not sure how else to name
-  SHIFT_ENTER: "shift+enter", // don't know how to name this either
+  ENTER: 'enter', // since this has multiple functions based on context, not sure how else to name
+  SHIFT_ENTER: 'shift+enter', // don't know how to name this either
 
-  DELETE: "backspace",
+  DELETE: 'backspace',
+  EQUALS: '=',
 
 /*
-  SHRINK: "shift+right",
-  EXTEND_PREV: "shift+up",
-  EXTEND_NEXT: "shift+down",
-  CANCEL_EDIT: "escape",
+  SHRINK: 'shift+right',
+  EXTEND_PREV: 'shift+up',
+  EXTEND_NEXT: 'shift+down',
+  CANCEL_EDIT: 'escape',
 */
 };
+
+// "Regular" (printable, basically) characters that are used as commands
+const COMMAND_CHARS = [
+  '=',
+];
 
 const DispatchContext = createContext();
 
@@ -153,7 +159,13 @@ export default function Editor({ autoFocus }) {
   // TODO: memoize generation of this
   const handlers = {};
   for (const k of Object.keys(keyMap)) {
-    handlers[k] = (() => () => { dispatch({type: k}) })(); // IIFE to bind k
+    handlers[k] = (() => (e) => {
+      if (COMMAND_CHARS.includes(e.key)) {
+        // NOTE: This is important, otherwise keys like '=' will go into the input element
+        e.preventDefault();
+      }
+      dispatch({type: k});
+    })(); // IIFE to bind k
   }
 
   const onKeyDown = e => {
@@ -163,7 +175,8 @@ export default function Editor({ autoFocus }) {
     }
     // TODO: This is not a robust check, but the spec is complicated
     // (https://www.w3.org/TR/uievents-key/#keys-whitespace)
-    if (([...e.key].length === 1) && !e.altkey && !e.ctrlKey && !e.metaKey) {
+    if (([...e.key].length === 1) && !e.altkey && !e.ctrlKey && !e.metaKey && !COMMAND_CHARS.includes(e.key)) {
+      e.preventDefault(); // If we generate a CHAR action, then don't also allow default
       dispatch({
         type: 'CHAR',
         char: e.key,

@@ -4,6 +4,7 @@ import genuid from './uid';
 interface Action {
   type: string;
   text?: string;
+  char?: string;
 }
 
 interface ProgramNode {
@@ -61,7 +62,6 @@ type Path = (string | number)[];
 
 interface TextEdit {
   text: string;
-  quick: boolean;
 }
 
 interface HandlerArgs {
@@ -191,7 +191,7 @@ function deleteAssignment(node: ProgramNode, removeIdx: number): [ProgramNode, P
         type: 'UndefinedExpression',
       }
     });
-    return [newNode, ['assignments', 0, 'identifier'], {text: '', quick: true}];
+    return [newNode, ['assignments', 0, 'identifier'], {text: ''}];
   }
 }
 
@@ -279,7 +279,7 @@ const HANDLERS: Handler[] = [
         name: textEdit.text ? textEdit.text : null, // TODO: ensure that it's valid?
       }, subpath, null];
     } else {
-      return [node, subpath, {text: node.name || '', quick: false}];
+      return [node, subpath, {text: node.name || ''}];
     }
   }],
 
@@ -301,10 +301,10 @@ const HANDLERS: Handler[] = [
       // Initialize the input
       switch (node.type) {
         case 'IntegerLiteral':
-          return [node, subpath, {text: node.value.toString(), quick: false}];
+          return [node, subpath, {text: node.value.toString()}];
 
         case 'UndefinedExpression':
-          return [node, subpath, {text: '', quick: false}];
+          return [node, subpath, {text: ''}];
 
         default:
           throw new Error();
@@ -342,20 +342,46 @@ const HANDLERS: Handler[] = [
           ...node.assignments.slice(afterIdx+1),
         ],
       };
-      return [newNode, ['assignments', afterIdx+1, 'identifier'], {text: '', quick: true}];
+      return [newNode, ['assignments', afterIdx+1, 'identifier'], {text: ''}];
     }
   }],
 
+  /**
+   * DELETE when editing the LHS of assignment will delete the assignment, if the input box is empty and the RHS is undefined.
+   * This is mainly to allow us to easily "undo" adding a new assignment by just hitting DELETE.
+   */
   ['Program', ['DELETE'], ({node, subpath, textEdit}) => {
     if (!isProgramNode(node)) {
       throw new Error();
     }
-    if ((subpath.length === 3) && (subpath[0] === 'assignments') && (subpath[2] === 'identifier') && textEdit && textEdit.quick && (textEdit.text === '')) {
+    if ((subpath.length === 3) && (subpath[0] === 'assignments') && (subpath[2] === 'identifier') && textEdit && (textEdit.text === '')) {
       const removeIdx = subpath[1];
       if (typeof(removeIdx) !== 'number') {
         throw new Error();
       }
-      return deleteAssignment(node, removeIdx);
+      if (node.assignments[removeIdx].expression.type === 'UndefinedExpression') {
+        if (typeof(removeIdx) !== 'number') {
+          throw new Error();
+        }
+        return deleteAssignment(node, removeIdx);
+      }
+    }
+  }],
+
+  ['Identifier', ['CHAR'], ({node, subpath, textEdit, action}) => {
+    if (textEdit || subpath.length || !action.char) {
+      throw new Error();
+    }
+    return [node, subpath, {text: action.char}];
+  }],
+
+  /**
+   * EQUALS on an assignment will move to editing the RHS in many cases.
+   */
+  ['Assignment', ['EQUALS'], ({node, subpath, textEdit}) => {
+    if ((!textEdit && (equiv(subpath, []) || equiv(subpath, ['identifier']) || equiv(subpath, ['expression']))) ||
+    (textEdit && equiv(subpath, ['identifier']))) {
+      return [node, ['expression'], {text: ''}];
     }
   }],
 ];
