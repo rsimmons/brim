@@ -378,6 +378,16 @@ const HANDLERS: Handler[] = [
     }
   }],
 
+  ['Expression', ['CHAR'], ({node, subpath, textEdit, action}) => {
+    if (textEdit || subpath.length || !action.char) {
+      throw new Error();
+    }
+    // Space is not a "command character", but I don't think we want it to trigger the start of editing
+    if (action.char !== ' ') {
+      return [node, subpath, {text: action.char}];
+    }
+  }],
+
   /**
    * EQUALS on an assignment will move to editing the RHS in many cases.
    */
