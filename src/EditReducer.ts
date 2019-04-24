@@ -61,6 +61,7 @@ type Path = (string | number)[];
 
 interface TextEdit {
   text: string;
+  quick: boolean;
 }
 
 interface HandlerArgs {
@@ -159,32 +160,63 @@ export function nodeSplitPath(node: Node, root: Node, path: Path): [Path, Path] 
 
 const equiv = (a: any, b: any): boolean => JSON.stringify(a) === JSON.stringify(b);
 
+function deleteAssignment(node: ProgramNode, removeIdx: number): [ProgramNode, Path, null] {
+  // TODO: Handle case where we delete all assignments
+  if (typeof(removeIdx) !== 'number') {
+    throw new Error();
+  }
+  const newNode = {
+    ...node,
+    assignments: [
+      ...node.assignments.slice(0, removeIdx),
+      ...node.assignments.slice(removeIdx+1),
+    ],
+  };
+  let newIdx = removeIdx-1;
+  newIdx = Math.max(newIdx, 0);
+  newIdx = Math.min(newIdx, node.assignments.length-1);
+  return [newNode, ['assignments', newIdx], null];
+}
+
 const HANDLERS: Handler[] = [
-  ['Assignment', ['MOVE_LEFT'], ({node, subpath}) => {
-    if (subpath.length === 0) {
+  ['Assignment', ['MOVE_LEFT'], ({node, subpath, textEdit}) => {
+    if (textEdit) {
+      return;
+    }
+    if ((subpath.length === 0)) {
       return [node, ['identifier'], null]; // shrink to left
     } else if (equiv(subpath, ['expression'])) {
       return [node, ['identifier'], null];
     }
   }],
 
-  ['Assignment', ['MOVE_RIGHT'], ({node, subpath}) => {
-    if (subpath.length === 0) {
+  ['Assignment', ['MOVE_RIGHT'], ({node, subpath, textEdit}) => {
+    if (textEdit) {
+      return;
+    }
+    if ((subpath.length === 0)) {
       return [node, ['expression'], null]; // shrink to right
     } else if (equiv(subpath, ['identifier'])) {
       return [node, ['expression'], null];
     }
   }],
 
-  ['Assignment', ['EXPAND'], ({node, subpath}) => {
+  ['Assignment', ['EXPAND'], ({node, subpath, textEdit}) => {
+    if (textEdit) {
+      return;
+    }
     if (subpath.length === 1) {
       return [node, [], null];
     }
   }],
 
-  ['Program', ['MOVE_UP', 'MOVE_DOWN'], ({node, subpath, action}) => {
+  ['Program', ['MOVE_UP', 'MOVE_DOWN'], ({node, subpath, textEdit, action}) => {
     if (!isProgramNode(node)) {
       throw new Error();
+    }
+
+    if (textEdit) {
+      return;
     }
 
     // NOTE: This assumes that selection is on/in one of the assignments
@@ -204,27 +236,19 @@ const HANDLERS: Handler[] = [
     }
   }],
 
-  ['Program', ['DELETE'], ({node, subpath}) => {
+  ['Program', ['DELETE'], ({node, subpath, textEdit}) => {
     if (!isProgramNode(node)) {
       throw new Error();
     }
     if ((subpath.length === 2) && (subpath[0] === 'assignments')) {
-      // TODO: Handle case where we delete the last assignment
+      if (textEdit) {
+        throw new Error();
+      }
       const removeIdx = subpath[1];
       if (typeof(removeIdx) !== 'number') {
         throw new Error();
       }
-      const newNode = {
-        ...node,
-        assignments: [
-          ...node.assignments.slice(0, removeIdx),
-          ...node.assignments.slice(removeIdx+1),
-        ],
-      };
-      let newIdx = removeIdx-1;
-      newIdx = Math.max(newIdx, 0);
-      newIdx = Math.min(newIdx, node.assignments.length-1);
-      return [newNode, ['assignments', newIdx], null];
+      return deleteAssignment(node, removeIdx);
     }
   }],
 
@@ -238,7 +262,7 @@ const HANDLERS: Handler[] = [
         name: textEdit.text ? textEdit.text : null, // TODO: ensure that it's valid?
       }, subpath, null];
     } else {
-      return [node, subpath, {text: node.name || ''}];
+      return [node, subpath, {text: node.name || '', quick: false}];
     }
   }],
 
@@ -260,10 +284,10 @@ const HANDLERS: Handler[] = [
       // Initialize the input
       switch (node.type) {
         case 'IntegerLiteral':
-          return [node, subpath, {text: node.value.toString()}];
+          return [node, subpath, {text: node.value.toString(), quick: false}];
 
         case 'UndefinedExpression':
-          return [node, subpath, {text: ''}];
+          return [node, subpath, {text: '', quick: false}];
 
         default:
           throw new Error();
@@ -271,11 +295,14 @@ const HANDLERS: Handler[] = [
     }
   }],
 
-  ['Program', ['ENTER'], ({node, subpath}) => {
+  ['Program', ['ENTER'], ({node, subpath, textEdit}) => {
     if (!isProgramNode(node)) {
       throw new Error();
     }
     if ((subpath.length === 2) && (subpath[0] === 'assignments')) {
+      if (textEdit) {
+        throw new Error();
+      }
       const afterIdx = subpath[1];
       if (typeof(afterIdx) !== 'number') {
         throw new Error();
@@ -298,7 +325,20 @@ const HANDLERS: Handler[] = [
           ...node.assignments.slice(afterIdx+1),
         ],
       };
-      return [newNode, ['assignments', afterIdx+1, 'identifier'], {text: ''}];
+      return [newNode, ['assignments', afterIdx+1, 'identifier'], {text: '', quick: true}];
+    }
+  }],
+
+  ['Program', ['DELETE'], ({node, subpath, textEdit}) => {
+    if (!isProgramNode(node)) {
+      throw new Error();
+    }
+    if ((subpath.length === 3) && (subpath[0] === 'assignments') && (subpath[2] === 'identifier') && textEdit && textEdit.quick && (textEdit.text === '')) {
+      const removeIdx = subpath[1];
+      if (typeof(removeIdx) !== 'number') {
+        throw new Error();
+      }
+      return deleteAssignment(node, removeIdx);
     }
   }],
 ];
@@ -421,7 +461,7 @@ export function reducer(state: State, action: Action): State {
     if (!state.textEdit) {
       throw new Error();
     }
-    if (!action.text) {
+    if (typeof(action.text) !== 'string') {
       throw new Error();
     }
 

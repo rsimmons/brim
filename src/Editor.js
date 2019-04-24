@@ -14,7 +14,7 @@ const keyMap = {
   ENTER: "enter", // since this has multiple functions based on context, not sure how else to name
   SHIFT_ENTER: "shift+enter", // don't know how to name this either
 
-  DELETE: "Backspace",
+  DELETE: "backspace",
 
 /*
   SHRINK: "shift+right",
@@ -23,18 +23,6 @@ const keyMap = {
   CANCEL_EDIT: "escape",
 */
 };
-
-const COMMANDS_OBSERVED_IN_INPUTS = [
-  "ENTER",
-  // "ESCAPE",
-];
-
-const KEYS_OBSERVED_IN_INPUTS = COMMANDS_OBSERVED_IN_INPUTS.map(cmd => {
-  if (!keyMap.hasOwnProperty(cmd)) {
-    throw new Error();
-  }
-  return keyMap[cmd];
-});
 
 const DispatchContext = createContext();
 
@@ -185,7 +173,7 @@ export default function Editor({ autoFocus }) {
 
   return (
     <HotKeys keyMap={keyMap} handlers={handlers}>
-      <ObserveKeys only={KEYS_OBSERVED_IN_INPUTS}>
+      <ObserveKeys>
         <div className="Editor" onKeyDown={onKeyDown} tabIndex="0" ref={editorElem}>
           <DispatchContext.Provider value={dispatch}>
             <SelectedNodeContext.Provider value={nodeFromPath(state.root, state.selectionPath)}>
