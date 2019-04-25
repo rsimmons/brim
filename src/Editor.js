@@ -176,7 +176,7 @@ export default function Editor({ autoFocus }) {
   const handlers = {};
   for (const k of Object.keys(keyMap)) {
     handlers[k] = (() => (e) => {
-      if (COMMAND_CHARS.includes(e.key)) {
+      if ((e.target.tagName.toLowerCase() !== 'input') || (COMMAND_CHARS.includes(e.key))) {
         // NOTE: This is important, otherwise keys like '=' will go into the input element
         e.preventDefault();
       }
