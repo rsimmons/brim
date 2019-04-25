@@ -71,10 +71,10 @@ function ProgramView({ program }) {
 function AssignmentView({ assignment }) {
   return (
     <div className="Editor-assignment">
-      <span className={useWithSelectedClass(assignment)}>
-        <IdentifierView identifier={assignment.identifier} />
-        {' = '}
-        <ExpressionView expression={assignment.expression} />
+      <span className={useWithSelectedClass(assignment, 'Editor-assignment-inner')}>
+        <div><IdentifierView identifier={assignment.identifier} /></div>
+        <div>&nbsp;=&nbsp;</div>
+        <div><ExpressionView expression={assignment.expression} /></div>
       </span>
     </div>
   );
@@ -103,11 +103,14 @@ function IdentifierView({ identifier }) {
 
 function NotEditingExpressionView({ expression }) {
   return (
-    <span className={useWithSelectedClass(expression)}>
+    <div className={useWithSelectedClass(expression)}>
       {(() => {
         switch (expression.type) {
           case 'IntegerLiteral':
             return expression.value;
+
+          case 'ArrayLiteral':
+            return '[array literal]';
 
           case 'UndefinedExpression':
             return <Hole />
@@ -116,7 +119,7 @@ function NotEditingExpressionView({ expression }) {
             throw new Error();
         }
       })()}
-    </span>
+    </div>
   );
 }
 
