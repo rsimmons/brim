@@ -9,9 +9,12 @@ const App: React.FC = () => {
       <div>
         <h2>Testing Tips</h2>
         <ul>
-          <li><strong>A bunch of shit only half-works.</strong></li>
+          <li><strong>The goal of this is to explore if there's a good way to do keyboard-driven structured code editing that doesn't suck. To not suck, I believe that there must be a very small number of keyboard commands, and they should be rather intuitive/obvious. As a bonus, it would be nice if it behaved similarly to spreadsheets or normal programming editors.</strong></li>
+          <li>Warning: A bunch of shit only half-works.</li>
           <li>If you don't see a green selection/cursor box, focus the editor.</li>
           <li>There's no mouse/touch support yet, only keyboard.</li>
+          <li>The AST always stays "well-formed", but some bits are allowed to be temporarily unspecified or invalid. The program may still be able to run with unspecified values, and it will be very clear to the user (red boxes) what is invalid/missing.</li>
+          <li>This code doesn't yet "run", it's just a fake language for now.</li>
           <li>Up/down arrows move up and down between assignments and array items.</li>
           <li>Left arrow generally moves "out" and right arrow generally moves "in" (to nested arrays, etc.).</li>
           <li>If LHS of an assignment is selected, left arrow moves "out" to select the entire assignment.</li>
