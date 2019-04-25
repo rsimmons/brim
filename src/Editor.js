@@ -4,18 +4,17 @@ import { initialState, reducer, nodeFromPath } from './EditReducer';
 import './Editor.css';
 
 const keyMap = {
-  MOVE_UP: 'up',
-  MOVE_DOWN: 'down',
-  MOVE_LEFT: 'left',
-  MOVE_RIGHT: 'right',
-
-  EXPAND: 'shift+left',
+  MOVE_PREV: 'up',
+  MOVE_NEXT: 'down',
+  MOVE_OUT: 'left',
+  MOVE_IN: 'right',
 
   ENTER: 'enter', // since this has multiple functions based on context, not sure how else to name
-  SHIFT_ENTER: 'shift+enter', // don't know how to name this either
+
+  INSERT_AFTER: 'shift+enter',
 
   DELETE: 'backspace',
-  EQUALS: '=',
+  ASSIGN: '=',
 
 /*
   SHRINK: 'shift+right',
@@ -51,11 +50,11 @@ function TextEditInput() {
     });
   };
 
-  return <input className="Editor-text-edit-input Editor-selected" value={textEdit.text} onChange={onChange} autoFocus />
+  return <div><input className="Editor-text-edit-input Editor-selected" value={textEdit.text} onChange={onChange} autoFocus /></div>
 }
 
 function Hole() {
-  return <span className="Editor-hole">&nbsp;</span>
+  return <div className="Editor-hole">&nbsp;</div>
 }
 
 function ProgramView({ program }) {
@@ -70,24 +69,22 @@ function ProgramView({ program }) {
 
 function AssignmentView({ assignment }) {
   return (
-    <div className="Editor-assignment">
-      <span className={useWithSelectedClass(assignment, 'Editor-assignment-inner')}>
-        <div><IdentifierView identifier={assignment.identifier} /></div>
-        <div>&nbsp;=&nbsp;</div>
-        <div><ExpressionView expression={assignment.expression} /></div>
-      </span>
+    <div className={useWithSelectedClass(assignment, 'Editor-assignment')}>
+      <IdentifierView identifier={assignment.identifier} />
+      <div>&nbsp;=&nbsp;</div>
+      <ExpressionView expression={assignment.expression} />
     </div>
   );
 }
 
 function NotEditingIdentifierView({ identifier }) {
   return (
-    <span className={useWithSelectedClass(identifier)}>
+    <div className={useWithSelectedClass(identifier)}>
       {(typeof identifier.name === 'string')
         ? identifier.name
         : <Hole />
       }
-    </span>
+    </div>
   );
 }
 
@@ -101,26 +98,42 @@ function IdentifierView({ identifier }) {
   }
 }
 
-function NotEditingExpressionView({ expression }) {
+function IntegerLiteralView({ integerLiteral }) {
+  return <div className={useWithSelectedClass(integerLiteral)}>{integerLiteral.value}</div>;
+}
+
+function ArrayLiteralView({ arrayLiteral }) {
   return (
-    <div className={useWithSelectedClass(expression)}>
-      {(() => {
-        switch (expression.type) {
-          case 'IntegerLiteral':
-            return expression.value;
-
-          case 'ArrayLiteral':
-            return '[array literal]';
-
-          case 'UndefinedExpression':
-            return <Hole />
-
-          default:
-            throw new Error();
-        }
-      })()}
+    <div className={useWithSelectedClass(arrayLiteral)}>
+      <div>[</div>
+      <div className="Editor-array-items">
+        {arrayLiteral.items.map(item => (
+          <div className="Editor-array-item"><ExpressionView expression={item} /></div>
+        ))}
+      </div>
+      <div>]</div>
     </div>
   );
+}
+
+function UndefinedExpressionView({ undefinedExpression }) {
+  return <div className={useWithSelectedClass(undefinedExpression)}><Hole /></div>;
+}
+
+function NotEditingExpressionView({ expression }) {
+  switch (expression.type) {
+    case 'IntegerLiteral':
+      return <IntegerLiteralView integerLiteral={expression} />
+
+    case 'ArrayLiteral':
+      return <ArrayLiteralView arrayLiteral={expression} />
+
+    case 'UndefinedExpression':
+      return <UndefinedExpressionView undefinedExpression={expression} />
+
+    default:
+      throw new Error();
+  }
 }
 
 function ExpressionView({ expression }) {
