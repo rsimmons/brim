@@ -195,6 +195,28 @@ function deleteAssignment(node: ProgramNode, removeIdx: number): [ProgramNode, P
   }
 }
 
+function updateIdentifier(node: IdentifierNode, text: string): IdentifierNode {
+  return {
+    ...node,
+    name: text ? text : null, // TODO: ensure that it's valid?
+  };
+}
+
+function updateExpression(node: ExpressionNode, text: string): ExpressionNode {
+  const FLOAT_REGEX = /^[-+]?(?:\d*\.?\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?$/;
+
+  if (FLOAT_REGEX.test(text)) {
+    return {
+      type: 'IntegerLiteral',
+      value: Number(text),
+    };
+  } else {
+    return {
+      type: 'UndefinedExpression',
+    };
+  }
+}
+
 const HANDLERS: Handler[] = [
   ['Assignment', ['MOVE_LEFT'], ({node, subpath, textEdit}) => {
     if (textEdit) {
@@ -276,7 +298,8 @@ const HANDLERS: Handler[] = [
     if (textEdit) {
       return [node, subpath, null];
     } else {
-      return [node, subpath, {text: node.name || ''}];
+      const nameText = node.name || '';
+      return [updateIdentifier(node, nameText), subpath, {text: nameText}];
     }
   }],
 
@@ -285,16 +308,21 @@ const HANDLERS: Handler[] = [
       return [node, subpath, null];
     } else {
       // Initialize the input
+      let initText;
       switch (node.type) {
         case 'IntegerLiteral':
-          return [node, subpath, {text: node.value.toString()}];
+         initText = node.value.toString();
+         break;
 
         case 'UndefinedExpression':
-          return [node, subpath, {text: ''}];
+          initText = '';
+          break;
 
         default:
           throw new Error();
       }
+
+      return [updateExpression(node, initText), subpath, {text: initText}];
     }
   }],
 
@@ -358,12 +386,15 @@ const HANDLERS: Handler[] = [
    * Typing a character on an identifier jumps straight into editing it (overwriting)
    */
   ['Identifier', ['CHAR'], ({node, subpath, textEdit, action}) => {
+    if (!isIdentifierNode(node)) {
+      throw new Error();
+    }
     if (textEdit || subpath.length || !action.char) {
       throw new Error();
     }
     // Space is not a "command character", but I don't think we want it to trigger the start of editing
     if (action.char !== ' ') {
-      return [node, subpath, {text: action.char}];
+      return [updateIdentifier(node, action.char), subpath, {text: action.char}];
     }
   }],
 
@@ -371,12 +402,15 @@ const HANDLERS: Handler[] = [
    * Typing a character on an expression jumps straight into editing it (overwriting)
    */
   ['Expression', ['CHAR'], ({node, subpath, textEdit, action}) => {
+    if (!isExpressionNode(node)) {
+      throw new Error();
+    }
     if (textEdit || subpath.length || !action.char) {
       throw new Error();
     }
     // Space is not a "command character", but I don't think we want it to trigger the start of editing
     if (action.char !== ' ') {
-      return [node, subpath, {text: action.char}];
+      return [updateExpression(node, action.char), subpath, {text: action.char}];
     }
   }],
 
@@ -384,9 +418,15 @@ const HANDLERS: Handler[] = [
    * EQUALS on an assignment will move to editing the RHS in many cases.
    */
   ['Assignment', ['EQUALS'], ({node, subpath, textEdit}) => {
+    if (!isAssignmentNode(node)) {
+      throw new Error();
+    }
     if ((!textEdit && (equiv(subpath, []) || equiv(subpath, ['identifier']) || equiv(subpath, ['expression']))) ||
     (textEdit && equiv(subpath, ['identifier']))) {
-      return [node, ['expression'], {text: ''}];
+      return [{
+        ...node,
+        expression: updateExpression(node.expression, ''),
+      }, ['expression'], {text: ''}];
     }
   }],
 
@@ -397,11 +437,14 @@ const HANDLERS: Handler[] = [
     if (typeof(action.text) !== 'string') {
       throw new Error();
     }
+    if (subpath.length !== 0) {
+      throw new Error();
+    }
+    if (!isIdentifierNode(node)) {
+      throw new Error();
+    }
 
-    return [{
-      ...node,
-      name: action.text ? action.text : null, // TODO: ensure that it's valid?
-    }, subpath, {text: action.text}];
+    return [updateIdentifier(node, action.text), subpath, {text: action.text}];
   }],
 
   ['Expression', ['SET_TEXT'], ({node, subpath, textEdit, action}) => {
@@ -411,22 +454,11 @@ const HANDLERS: Handler[] = [
     if (typeof(action.text) !== 'string') {
       throw new Error();
     }
-
-    const FLOAT_REGEX = /^[-+]?(?:\d*\.?\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?$/;
-    let newNode: Node;
-
-    if (FLOAT_REGEX.test(action.text)) {
-      newNode = {
-        type: 'IntegerLiteral',
-        value: Number(action.text),
-      };
-    } else {
-      newNode = {
-        type: 'UndefinedExpression',
-      };
+    if (!isExpressionNode(node)) {
+      throw new Error();
     }
 
-    return [newNode, subpath, {text: action.text}];
+    return [updateExpression(node, action.text), subpath, {text: action.text}];
   }],
 ];
 
