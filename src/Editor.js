@@ -18,6 +18,8 @@ const keyMap = {
 
   DELETE: 'backspace',
   ASSIGN: '=',
+  OPEN_ARRAY: '[',
+  CLOSE_ARRAY: ']',
 
 /*
   CANCEL_EDIT: 'escape',
@@ -30,6 +32,7 @@ const COMMAND_CHARS = [
   ';',
   ',',
   '[',
+  ']',
 ];
 
 const DispatchContext = createContext();

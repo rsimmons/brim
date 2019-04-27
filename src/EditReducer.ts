@@ -232,18 +232,7 @@ function updateIdentifier(node: IdentifierNode, text: string): IdentifierNode {
 function updateExpression(node: ExpressionNode, text: string): HandlerResult {
   const FLOAT_REGEX = /^[-+]?(?:\d*\.?\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?$/;
 
-  if (text === '[') {
-    return [{
-      type: 'ArrayLiteral',
-      uid: genuid(),
-      items: [
-        {
-          type: 'UndefinedExpression',
-          uid: genuid(),
-        }
-      ],
-    }, ['items', 0], {text: ''}];
-  } else if (FLOAT_REGEX.test(text)) {
+  if (FLOAT_REGEX.test(text)) {
     return [{
       type: 'IntegerLiteral',
       uid: genuid(),
@@ -650,6 +639,50 @@ const HANDLERS: Handler[] = [
           newIdx = Math.max(newIdx, 0);
           newIdx = Math.min(newIdx, node.items.length-1);
           return [newNode, ['items', newIdx], null];
+        }
+      }
+    }
+  }],
+
+  ['Expression', ['OPEN_ARRAY'], ({node, subpath, textEdit}) => {
+    if (!isExpressionNode(node)) {
+      throw new Error();
+    }
+
+    if ((subpath.length === 0) && (!textEdit || (textEdit.text === ''))) {
+      return [{
+        type: 'ArrayLiteral',
+        uid: genuid(),
+        items: [
+          {
+            type: 'UndefinedExpression',
+            uid: genuid(),
+          }
+        ],
+      }, ['items', 0], {text: ''}];
+    }
+  }],
+
+  ['ArrayLiteral', ['CLOSE_ARRAY'], ({node, subpath, textEdit}) => {
+    if (!isArrayLiteralNode(node)) {
+      throw new Error();
+    }
+    if ((subpath.length === 2) && (subpath[0] === 'items') && textEdit) {
+      const idx = subpath[1];
+      if (typeof(idx) !== 'number') {
+        throw new Error();
+      }
+      if (idx === (node.items.length-1)) {
+        // Editing the last item
+        if (textEdit.text === '') {
+          // Delete (empty) node we were editing, go back to to array
+          return [{
+            ...node,
+            items: node.items.slice(0, idx),
+          }, [], null];
+        } else {
+          // Finish edit, go back to to array
+          return [node, [], null];
         }
       }
     }
