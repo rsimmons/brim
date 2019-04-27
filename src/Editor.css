@@ -38,13 +38,12 @@
   padding: 1px 0;
   display: flex;
   align-items: flex-start;
-  width: fit-content;
 }
 
 .Editor-array-items {
   padding-left: 1em;
 }
 
-.Editor-array-item {
+.Editor-program, .Editor-assignment, .Editor-array-item {
   width: fit-content;
 }

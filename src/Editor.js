@@ -64,7 +64,7 @@ function Hole() {
 
 function ProgramView({ program }) {
   return (
-    <div>
+    <div className="Editor-program">
       {program.assignments.map((assignment) => (
         <AssignmentView assignment={assignment} key={assignment.uid} />
       ))}
