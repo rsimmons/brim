@@ -128,7 +128,7 @@ const SCHEMA_NODES = {
 
 // TODO: If we want to include other classes in the lists, generate an expansion over the closure
 const SCHEMA_CLASSES: {[nodeType: string]: string[]} = {
-  Expression: ['UndefinedExpression', 'IntegerLiteral'],
+  Expression: ['UndefinedExpression', 'IntegerLiteral', 'ArrayLiteral'],
 }
 
 export function nodeFromPath(root: Node, path: Path): Node {
@@ -217,23 +217,27 @@ function updateIdentifier(node: IdentifierNode, text: string): IdentifierNode {
   };
 }
 
-function updateExpression(node: ExpressionNode, text: string): ExpressionNode {
+function updateExpression(node: ExpressionNode, text: string): HandlerResult {
   const FLOAT_REGEX = /^[-+]?(?:\d*\.?\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?$/;
 
   if (text === '[') {
-    return {
+    return [{
       type: 'ArrayLiteral',
-      items: [],
-    }
+      items: [
+        {
+          type: 'UndefinedExpression',
+        }
+      ],
+    }, ['items', 0], {text: ''}];
   } else if (FLOAT_REGEX.test(text)) {
-    return {
+    return [{
       type: 'IntegerLiteral',
       value: Number(text),
-    };
+    }, [], {text}];
   } else {
-    return {
+    return [{
       type: 'UndefinedExpression',
-    };
+    }, [], {text}];
   }
 }
 
@@ -341,21 +345,20 @@ const HANDLERS: Handler[] = [
       return [node, subpath, null];
     } else {
       // Initialize the input
-      let initText;
       switch (node.type) {
         case 'IntegerLiteral':
-         initText = node.value.toString();
-         break;
+         return updateExpression(node, node.value.toString());
 
         case 'UndefinedExpression':
-          initText = '';
+          return updateExpression(node, '');
+
+        case 'ArrayLiteral':
+          // Can't directly edit
           break;
 
         default:
           throw new Error();
       }
-
-      return [updateExpression(node, initText), subpath, {text: initText}];
     }
   }],
 
@@ -440,7 +443,7 @@ const HANDLERS: Handler[] = [
     }
     // Space is not a "command character", but I don't think we want it to trigger the start of editing
     if (action.char !== ' ') {
-      return [updateExpression(node, action.char), subpath, {text: action.char}];
+      return updateExpression(node, action.char);
     }
   }],
 
@@ -455,7 +458,9 @@ const HANDLERS: Handler[] = [
     (textEdit && equiv(subpath, ['identifier']))) {
       return [{
         ...node,
-        expression: updateExpression(node.expression, ''),
+        expression: {
+          type: 'UndefinedExpression'
+        },
       }, ['expression'], {text: ''}];
     }
   }],
@@ -488,7 +493,7 @@ const HANDLERS: Handler[] = [
       throw new Error();
     }
 
-    return [updateExpression(node, action.text), subpath, {text: action.text}];
+    return updateExpression(node, action.text);
   }],
 
   // NOTE: We only allow MOVE_LEFT to act as ZOOM_OUT here because we know array is displayed vertically for now
@@ -558,6 +563,57 @@ const HANDLERS: Handler[] = [
         ],
       };
       return [newNode, ['items', afterIdx+1], {text: ''}];
+    }
+  }],
+
+  ['ArrayLiteral', ['DELETE'], ({node, subpath, textEdit}) => {
+    if (!isArrayLiteralNode(node)) {
+      throw new Error();
+    }
+    if (subpath.length === 2) {
+      if (node.items.length === 0) {
+        throw new Error();
+      }
+
+      // Selection is on an item
+      if (node.items.length === 1) {
+        // There is exactly one item
+        if (textEdit) {
+          // The single item is being edited, text edit is empty
+          if (textEdit.text === '') {
+            return [{
+              type: 'UndefinedExpression',
+            }, [], {text: ''}];
+          }
+        } else {
+          // The single item is not being edited
+          return [{
+            ...node,
+            items: [],
+          }, [], null];
+        }
+      } else {
+        // There is more than one item
+        if (!textEdit || (textEdit.text === '')) {
+          // We're not editing, or we are editing but text is empty, so we will delete this item
+          const removeIdx = subpath[1];
+          if (typeof(removeIdx) !== 'number') {
+            throw new Error();
+          }
+          const newNode = {
+            ...node,
+            items: [
+              ...node.items.slice(0, removeIdx),
+              ...node.items.slice(removeIdx+1),
+            ],
+          };
+
+          let newIdx = removeIdx-1;
+          newIdx = Math.max(newIdx, 0);
+          newIdx = Math.min(newIdx, node.items.length-1);
+          return [newNode, ['items', newIdx], null];
+        }
+      }
     }
   }],
 ];

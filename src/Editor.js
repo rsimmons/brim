@@ -29,6 +29,7 @@ const COMMAND_CHARS = [
   '=',
   ';',
   ',',
+  '[',
 ];
 
 const DispatchContext = createContext();
