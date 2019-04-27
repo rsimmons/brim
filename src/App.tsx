@@ -7,7 +7,7 @@ const App: React.FC = () => {
     <div className="App">
       <Editor autoFocus={true} />
       <div>
-        <h2>Testing Tips</h2>
+        <h2>Notes</h2>
         <ul>
           <li><strong>The goal of this is to explore if there's a good way to do keyboard-driven structured code editing that doesn't suck. To not suck, I believe that there must be a very small number of keyboard commands, and they should be rather intuitive/obvious. As a bonus, it would be nice if it behaved similarly to spreadsheets or normal programming editors.</strong></li>
           <li>Warning: A bunch of shit only half-works.</li>
@@ -16,14 +16,14 @@ const App: React.FC = () => {
           <li>The AST always stays "well-formed", but some bits are allowed to be temporarily unspecified or invalid. The program may still be able to run with unspecified values, and it will be very clear to the user (red boxes) what is invalid/missing.</li>
           <li>This code doesn't yet "run", it's just a fake language for now.</li>
           <li>Up/down arrows move up and down between assignments and array items.</li>
-          <li>Left arrow generally moves "out" and right arrow generally moves "in" (to nested arrays, etc.).</li>
+          <li>Shift-left (or just left, if unambiguous) "zooms out" selection and shift-right (Or just right, if unambiguous) "zooms in" selection (into nested structures).</li>
           <li>If LHS of an assignment is selected, left arrow moves "out" to select the entire assignment.</li>
           <li>Pressing enter on an identifier or number will begin editing it. Pressing enter again will stop editing.</li>
           <li>Instead of pressing enter, you can just start typing letters/numbers and it will begin the edit (overwriting what it there).</li>
           <li>Pressing the = key on the "top levels" of an assignment will beging editing the RHS.</li>
           <li>A red box indicates an undefined identifer or expression.</li>
           <li>If you enter an invalid number as an expression, it will ignore it and leave an undefined box.</li>
-          <li>Shift-enter adds a new assignment below the current one, or a new array item below the current one.</li>
+          <li>Semicolon or comma (interchangeable) will both add a new assignment or array item below the current one (even during a text edit).</li>
           <li>When an entire assignment is selected, delete will delete it.</li>
           <li><strong>TODO</strong> Allow creating array literals.</li>
           <li><strong>TODO</strong> Allow deleting array items.</li>
