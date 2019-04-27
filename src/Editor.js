@@ -111,7 +111,7 @@ function ArrayLiteralView({ arrayLiteral }) {
       <div>[</div>
       <div className="Editor-array-items">
         {arrayLiteral.items.map(item => (
-          <div className="Editor-array-item"><ExpressionView expression={item} /></div>
+          <div className="Editor-array-item" key={item.uid}><ExpressionView expression={item} /></div>
         ))}
       </div>
       <div>]</div>

@@ -9,6 +9,7 @@ interface Action {
 
 interface ProgramNode {
   type: 'Program';
+  uid: string;
   assignments: AssignmentNode[];
 }
 function isProgramNode(node: Node): node is ProgramNode {
@@ -27,6 +28,7 @@ function isAssignmentNode(node: Node): node is AssignmentNode {
 
 interface IdentifierNode {
   type: 'Identifier';
+  uid: string;
   name: string | null;
 }
 function isIdentifierNode(node: Node): node is IdentifierNode {
@@ -40,6 +42,7 @@ function isExpressionNode(node: Node): node is ExpressionNode {
 
 interface UndefinedExpressionNode {
   type: 'UndefinedExpression';
+  uid: string;
 }
 function isUndefinedExpressionNode(node: Node): node is UndefinedExpressionNode {
   return node.type === 'UndefinedExpression';
@@ -47,6 +50,7 @@ function isUndefinedExpressionNode(node: Node): node is UndefinedExpressionNode 
 
 interface IntegerLiteralNode {
   type: 'IntegerLiteral';
+  uid: string;
   value: number;
 }
 function isIntegerLiteralNode(node: Node): node is IntegerLiteralNode {
@@ -55,6 +59,7 @@ function isIntegerLiteralNode(node: Node): node is IntegerLiteralNode {
 
 interface ArrayLiteralNode {
   type: 'ArrayLiteral';
+  uid: string;
   items: ExpressionNode[];
 }
 function isArrayLiteralNode(node: Node): node is ArrayLiteralNode {
@@ -90,6 +95,7 @@ interface State {
 const SCHEMA_NODES = {
   Program: {
     fields: {
+      uid: {type: 'uid'},
       assignments: {type: 'nodes', nodeType: 'Assignment'},
     }
   },
@@ -104,23 +110,27 @@ const SCHEMA_NODES = {
 
   Identifier: {
     fields: {
+      uid: {type: 'uid'},
       name: {type: 'value'},
     }
   },
 
   UndefinedExpression: {
     fields: {
+      uid: {type: 'uid'},
     }
   },
 
   IntegerLiteral: {
     fields: {
+      uid: {type: 'uid'},
       value: {type: 'value'},
     }
   },
 
   ArrayLiteral: {
     fields: {
+      uid: {type: 'uid'},
       items: {type: 'nodes', nodeType: 'Expression'},
     }
   },
@@ -200,10 +210,12 @@ function deleteAssignment(node: ProgramNode, removeIdx: number): [ProgramNode, P
       uid: genuid(),
       identifier: {
         type: 'Identifier',
+        uid: genuid(),
         name: null,
       },
       expression: {
         type: 'UndefinedExpression',
+        uid: genuid(),
       }
     });
     return [newNode, ['assignments', 0, 'identifier'], {text: ''}];
@@ -223,20 +235,24 @@ function updateExpression(node: ExpressionNode, text: string): HandlerResult {
   if (text === '[') {
     return [{
       type: 'ArrayLiteral',
+      uid: genuid(),
       items: [
         {
           type: 'UndefinedExpression',
+          uid: genuid(),
         }
       ],
     }, ['items', 0], {text: ''}];
   } else if (FLOAT_REGEX.test(text)) {
     return [{
       type: 'IntegerLiteral',
+      uid: genuid(),
       value: Number(text),
     }, [], {text}];
   } else {
     return [{
       type: 'UndefinedExpression',
+      uid: genuid(),
     }, [], {text}];
   }
 }
@@ -380,10 +396,12 @@ const HANDLERS: Handler[] = [
             uid: genuid(),
             identifier: {
               type: 'Identifier',
+              uid: genuid(),
               name: null,
             },
             expression: {
               type: 'UndefinedExpression',
+              uid: genuid(),
             }
           },
           ...node.assignments.slice(afterIdx+1),
@@ -459,7 +477,8 @@ const HANDLERS: Handler[] = [
       return [{
         ...node,
         expression: {
-          type: 'UndefinedExpression'
+          type: 'UndefinedExpression',
+          uid: genuid(),
         },
       }, ['expression'], {text: ''}];
     }
@@ -558,6 +577,7 @@ const HANDLERS: Handler[] = [
           ...node.items.slice(0, afterIdx+1),
           {
             type: 'UndefinedExpression',
+            uid: genuid(),
           },
           ...node.items.slice(afterIdx+1),
         ],
@@ -583,6 +603,7 @@ const HANDLERS: Handler[] = [
           if (textEdit.text === '') {
             return [{
               type: 'UndefinedExpression',
+              uid: genuid(),
             }, [], {text: ''}];
           }
         } else {
@@ -779,16 +800,19 @@ export const initialState: State = {
   // },
   root: {
     type: 'Program',
+    uid: genuid(),
     assignments: [
       {
         type: 'Assignment',
         uid: genuid(),
         identifier: {
           type: 'Identifier',
+          uid: genuid(),
           name: 'foo',
         },
         expression: {
           type: 'IntegerLiteral',
+          uid: genuid(),
           value: 123,
         }
       },
@@ -797,10 +821,12 @@ export const initialState: State = {
         uid: genuid(),
         identifier: {
           type: 'Identifier',
+          uid: genuid(),
           name: 'bar',
         },
         expression: {
           type: 'IntegerLiteral',
+          uid: genuid(),
           value: 456,
         }
       },
@@ -809,10 +835,12 @@ export const initialState: State = {
         uid: genuid(),
         identifier: {
           type: 'Identifier',
+          uid: genuid(),
           name: 'baz',
         },
         expression: {
           type: 'IntegerLiteral',
+          uid: genuid(),
           value: 789,
         }
       },
@@ -821,10 +849,12 @@ export const initialState: State = {
         uid: genuid(),
         identifier: {
           type: 'Identifier',
+          uid: genuid(),
           name: null,
         },
         expression: {
           type: 'IntegerLiteral',
+          uid: genuid(),
           value: 4321,
         }
       },
@@ -833,30 +863,37 @@ export const initialState: State = {
         uid: genuid(),
         identifier: {
           type: 'Identifier',
+          uid: genuid(),
           name: 'blap',
         },
         expression: {
           type: 'ArrayLiteral',
+          uid: genuid(),
           items: [
             {
               type: 'IntegerLiteral',
+              uid: genuid(),
               value: 123,
             },
             {
               type: 'ArrayLiteral',
+              uid: genuid(),
               items: [
                 {
                   type: 'IntegerLiteral',
+                  uid: genuid(),
                   value: 345,
                 },
                 {
                   type: 'IntegerLiteral',
+                  uid: genuid(),
                   value: 456,
                 },
               ],
             },
             {
               type: 'IntegerLiteral',
+              uid: genuid(),
               value: 234,
             },
           ],
@@ -867,10 +904,12 @@ export const initialState: State = {
         uid: genuid(),
         identifier: {
           type: 'Identifier',
+          uid: genuid(),
           name: 'quux',
         },
         expression: {
           type: 'UndefinedExpression',
+          uid: genuid(),
         }
       },
     ]
