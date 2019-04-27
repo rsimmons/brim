@@ -25,6 +25,7 @@ const App: React.FC = () => {
           <li>If you enter an invalid number as an expression, it will ignore it and leave an undefined box.</li>
           <li>Semicolon or comma (interchangeable) will both add a new assignment or array item below the current one (even during a text edit).</li>
           <li>When an entire assignment is selected, delete will delete it.</li>
+          <li>Pressing [ will create an array literal. Pressing ] when editing the last item is a shortcut to "close" the array.</li>
           <li><strong>TODO</strong> Allow creating array literals.</li>
           <li><strong>TODO</strong> Allow deleting array items.</li>
           <li><strong>TODO</strong> Validate LHS identifiers.</li>
