@@ -530,11 +530,28 @@ const HANDLERS: Handler[] = [
 
   // NOTE: We only allow MOVE_RIGHT to act as ZOOM_IN here because we know it will be in a vertical-list container
   ['ArrayLiteral', ['ZOOM_IN', 'MOVE_RIGHT'], ({node, subpath, textEdit}) => {
+    if (!isArrayLiteralNode(node)) {
+      throw new Error();
+    }
     if (textEdit) {
       return;
     }
     if (subpath.length === 0) {
-      return [node, ['items', 0], null];
+      // We do a special thing here: If the array is empty, we create a single undefined item.
+      // This gives us a way to add a new element to an empty array.
+      if (node.items.length === 0) {
+        return [{
+          ...node,
+          items: [
+            {
+              type: 'UndefinedExpression',
+              uid: genuid(),
+            }
+          ],
+        }, ['items', 0], null];
+      } else {
+        return [node, ['items', 0], null];
+      }
     }
   }],
 
