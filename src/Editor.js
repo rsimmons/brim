@@ -12,7 +12,7 @@ const keyMap = {
   ZOOM_IN: 'shift+right',
   ZOOM_OUT: 'shift+left',
 
-  ENTER: 'enter', // since this has multiple functions based on context, not sure how else to name
+  ENTER: 'enter', // could the command be TOGGLE_EDIT?
 
   INSERT_AFTER: [';', ','],
 
@@ -20,9 +20,6 @@ const keyMap = {
   ASSIGN: '=',
 
 /*
-  SHRINK: 'shift+right',
-  EXTEND_PREV: 'shift+up',
-  EXTEND_NEXT: 'shift+down',
   CANCEL_EDIT: 'escape',
 */
 };
