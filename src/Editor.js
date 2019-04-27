@@ -4,14 +4,17 @@ import { initialState, reducer, nodeFromPath } from './EditReducer';
 import './Editor.css';
 
 const keyMap = {
-  MOVE_PREV: 'up',
-  MOVE_NEXT: 'down',
-  MOVE_OUT: 'left',
-  MOVE_IN: 'right',
+  MOVE_UP: 'up',
+  MOVE_DOWN: 'down',
+  MOVE_LEFT: 'left',
+  MOVE_RIGHT: 'right',
+
+  ZOOM_IN: 'shift+right',
+  ZOOM_OUT: 'shift+left',
 
   ENTER: 'enter', // since this has multiple functions based on context, not sure how else to name
 
-  INSERT_AFTER: 'shift+enter',
+  INSERT_AFTER: [';', ','],
 
   DELETE: 'backspace',
   ASSIGN: '=',
@@ -27,6 +30,8 @@ const keyMap = {
 // "Regular" (printable, basically) characters that are used as commands
 const COMMAND_CHARS = [
   '=',
+  ';',
+  ',',
 ];
 
 const DispatchContext = createContext();

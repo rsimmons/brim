@@ -238,29 +238,49 @@ function updateExpression(node: ExpressionNode, text: string): ExpressionNode {
 }
 
 const HANDLERS: Handler[] = [
-  ['Assignment', ['MOVE_OUT'], ({node, subpath, textEdit}) => {
+  ['Assignment', ['MOVE_LEFT'], ({node, subpath, textEdit}) => {
+    if (textEdit) {
+      return;
+    }
+    if (equiv(subpath, ['expression'])) {
+      return [node, ['identifier'], null];
+    }
+    if (equiv(subpath, ['identifier'])) { // NOTE: Behave like ZOOM_OUT since unambiguous
+      return [node, [], null];
+    }
+  }],
+
+  ['Assignment', ['MOVE_RIGHT'], ({node, subpath, textEdit}) => {
     if (textEdit) {
       return;
     }
     if (equiv(subpath, ['identifier'])) {
-      return [node, [], null];
-    } else if (equiv(subpath, ['expression'])) {
+      return [node, ['expression'], null];
+    }
+    if (equiv(subpath, [])) { // NOTE: Behave like ZOOM_IN since unambiguous
       return [node, ['identifier'], null];
     }
   }],
 
-  ['Assignment', ['MOVE_IN'], ({node, subpath, textEdit}) => {
+  ['Assignment', ['ZOOM_IN'], ({node, subpath, textEdit}) => {
     if (textEdit) {
       return;
     }
     if (equiv(subpath, [])) {
       return [node, ['identifier'], null];
-    } else if (equiv(subpath, ['identifier'])) {
-      return [node, ['expression'], null];
     }
   }],
 
-  ['Program', ['MOVE_PREV', 'MOVE_NEXT'], ({node, subpath, textEdit, action}) => {
+  ['Assignment', ['ZOOM_OUT'], ({node, subpath, textEdit}) => {
+    if (textEdit) {
+      return;
+    }
+    if (equiv(subpath, ['identifier']) || equiv(subpath, ['expression'])) {
+      return [node, [], null];
+    }
+  }],
+
+  ['Program', ['MOVE_UP', 'MOVE_DOWN'], ({node, subpath, textEdit, action}) => {
     if (!isProgramNode(node)) {
       throw new Error();
     }
@@ -275,7 +295,7 @@ const HANDLERS: Handler[] = [
       if (typeof idx !== 'number') {
         throw new Error();
       }
-      let newIdx = idx + ((action.type === 'MOVE_PREV') ? -1 : 1);
+      let newIdx = idx + ((action.type === 'MOVE_UP') ? -1 : 1);
       newIdx = Math.max(newIdx, 0);
       newIdx = Math.min(newIdx, node.assignments.length-1);
       return newIdx;
@@ -343,7 +363,7 @@ const HANDLERS: Handler[] = [
     if (!isProgramNode(node)) {
       throw new Error();
     }
-    if ((subpath.length >= 2) && (subpath[0] === 'assignments') && !textEdit) {
+    if ((subpath.length >= 2) && (subpath[0] === 'assignments')) {
       const afterIdx = subpath[1];
       if (typeof(afterIdx) !== 'number') {
         throw new Error();
@@ -471,7 +491,8 @@ const HANDLERS: Handler[] = [
     return [updateExpression(node, action.text), subpath, {text: action.text}];
   }],
 
-  ['ArrayLiteral', ['MOVE_OUT'], ({node, subpath, textEdit}) => {
+  // NOTE: We only allow MOVE_LEFT to act as ZOOM_OUT here because we know array is displayed vertically for now
+  ['ArrayLiteral', ['ZOOM_OUT', 'MOVE_LEFT'], ({node, subpath, textEdit}) => {
     if (textEdit) {
       return;
     }
@@ -483,7 +504,8 @@ const HANDLERS: Handler[] = [
     }
   }],
 
-  ['ArrayLiteral', ['MOVE_IN'], ({node, subpath, textEdit}) => {
+  // NOTE: We only allow MOVE_RIGHT to act as ZOOM_IN here because we know it will be in a vertical-list container
+  ['ArrayLiteral', ['ZOOM_IN', 'MOVE_RIGHT'], ({node, subpath, textEdit}) => {
     if (textEdit) {
       return;
     }
@@ -492,7 +514,7 @@ const HANDLERS: Handler[] = [
     }
   }],
 
-  ['ArrayLiteral', ['MOVE_PREV', 'MOVE_NEXT'], ({node, subpath, textEdit, action}) => {
+  ['ArrayLiteral', ['MOVE_UP', 'MOVE_DOWN'], ({node, subpath, textEdit, action}) => {
     if (!isArrayLiteralNode(node)) {
       throw new Error();
     }
@@ -506,7 +528,7 @@ const HANDLERS: Handler[] = [
       if (typeof idx !== 'number') {
         throw new Error();
       }
-      const newIdx = idx + ((action.type === 'MOVE_PREV') ? -1 : 1);
+      const newIdx = idx + ((action.type === 'MOVE_UP') ? -1 : 1);
 
       if ((newIdx < 0) || (newIdx >= node.items.length)) {
         return [node, [], null];
@@ -520,7 +542,7 @@ const HANDLERS: Handler[] = [
     if (!isArrayLiteralNode(node)) {
       throw new Error();
     }
-    if ((subpath.length === 2) && (subpath[0] === 'items') && !textEdit) {
+    if ((subpath.length === 2) && (subpath[0] === 'items')) {
       const afterIdx = subpath[1];
       if (typeof(afterIdx) !== 'number') {
         throw new Error();
