@@ -9,27 +9,15 @@ interface Action {
 
 interface ProgramNode {
   type: 'Program';
-  uid: string;
-  assignments: AssignmentNode[];
+  expressions: ExpressionNode[];
 }
 function isProgramNode(node: Node): node is ProgramNode {
   return node.type === 'Program';
 }
 
-interface AssignmentNode {
-  type: 'Assignment';
-  uid: string;
-  identifier: IdentifierNode;
-  expression: ExpressionNode;
-}
-function isAssignmentNode(node: Node): node is AssignmentNode {
-  return node.type === 'Assignment';
-}
-
 interface IdentifierNode {
   type: 'Identifier';
-  uid: string;
-  name: string | null;
+  name: string;
 }
 function isIdentifierNode(node: Node): node is IdentifierNode {
   return node.type === 'Identifier';
@@ -43,6 +31,7 @@ function isExpressionNode(node: Node): node is ExpressionNode {
 interface UndefinedExpressionNode {
   type: 'UndefinedExpression';
   uid: string;
+  identifier: IdentifierNode | null;
 }
 function isUndefinedExpressionNode(node: Node): node is UndefinedExpressionNode {
   return node.type === 'UndefinedExpression';
@@ -51,6 +40,7 @@ function isUndefinedExpressionNode(node: Node): node is UndefinedExpressionNode 
 interface IntegerLiteralNode {
   type: 'IntegerLiteral';
   uid: string;
+  identifier: IdentifierNode | null;
   value: number;
 }
 function isIntegerLiteralNode(node: Node): node is IntegerLiteralNode {
@@ -60,15 +50,16 @@ function isIntegerLiteralNode(node: Node): node is IntegerLiteralNode {
 interface ArrayLiteralNode {
   type: 'ArrayLiteral';
   uid: string;
+  identifier: IdentifierNode | null;
   items: ExpressionNode[];
 }
 function isArrayLiteralNode(node: Node): node is ArrayLiteralNode {
   return node.type === 'ArrayLiteral';
 }
 
-type Node = ProgramNode | AssignmentNode | IdentifierNode | ExpressionNode;
+type Node = ProgramNode | IdentifierNode | ExpressionNode;
 function isNode(node: any): node is Node {
-  return isProgramNode(node) || isAssignmentNode(node) || isIdentifierNode(node) || isExpressionNode(node);
+  return isProgramNode(node) || isIdentifierNode(node) || isExpressionNode(node);
 }
 
 type Path = (string | number)[];
@@ -95,22 +86,12 @@ interface State {
 const SCHEMA_NODES = {
   Program: {
     fields: {
-      uid: {type: 'uid'},
-      assignments: {type: 'nodes', nodeType: 'Assignment'},
-    }
-  },
-
-  Assignment: {
-    fields: {
-      uid: {type: 'uid'},
-      identifier: {type: 'node', nodeType: 'Identifier'},
-      expression: {type: 'node', nodeType: 'Expression'},
+      expressions: {type: 'nodes'},
     }
   },
 
   Identifier: {
     fields: {
-      uid: {type: 'uid'},
       name: {type: 'value'},
     }
   },
@@ -118,12 +99,14 @@ const SCHEMA_NODES = {
   UndefinedExpression: {
     fields: {
       uid: {type: 'uid'},
+      identifier: {type: 'node'},
     }
   },
 
   IntegerLiteral: {
     fields: {
       uid: {type: 'uid'},
+      identifier: {type: 'node'},
       value: {type: 'value'},
     }
   },
@@ -131,7 +114,8 @@ const SCHEMA_NODES = {
   ArrayLiteral: {
     fields: {
       uid: {type: 'uid'},
-      items: {type: 'nodes', nodeType: 'Expression'},
+      identifier: {type: 'node'},
+      items: {type: 'nodes'},
     }
   },
 };
@@ -185,48 +169,33 @@ export function nodeSplitPath(node: Node, root: Node, path: Path): [Path, Path] 
 
 const equiv = (a: any, b: any): boolean => JSON.stringify(a) === JSON.stringify(b);
 
-function deleteAssignment(node: ProgramNode, removeIdx: number): [ProgramNode, Path, TextEdit | null] {
-  // TODO: Handle case where we delete all assignments
+function deleteExpression(node: ProgramNode, removeIdx: number): [ProgramNode, Path, TextEdit | null] {
+  // TODO: Handle case where we delete all expressions
   if (typeof(removeIdx) !== 'number') {
     throw new Error();
   }
   const newNode = {
     ...node,
-    assignments: [
-      ...node.assignments.slice(0, removeIdx),
-      ...node.assignments.slice(removeIdx+1),
+    expressions: [
+      ...node.expressions.slice(0, removeIdx),
+      ...node.expressions.slice(removeIdx+1),
     ],
   };
 
-  if (newNode.assignments.length) {
+  if (newNode.expressions.length) {
     let newIdx = removeIdx-1;
     newIdx = Math.max(newIdx, 0);
-    newIdx = Math.min(newIdx, node.assignments.length-1);
-    return [newNode, ['assignments', newIdx], null];
+    newIdx = Math.min(newIdx, node.expressions.length-1);
+    return [newNode, ['expressions', newIdx], null];
   } else {
-    // We've deleted all assignments, so make a single empty one.
-    newNode.assignments.push({
-      type: 'Assignment',
+    // We've deleted all expressions, so make a single empty one.
+    newNode.expressions.push({
+      type: 'UndefinedExpression',
       uid: genuid(),
-      identifier: {
-        type: 'Identifier',
-        uid: genuid(),
-        name: null,
-      },
-      expression: {
-        type: 'UndefinedExpression',
-        uid: genuid(),
-      }
+      identifier: null,
     });
-    return [newNode, ['assignments', 0, 'identifier'], {text: ''}];
+    return [newNode, ['expressions', 0], {text: ''}];
   }
-}
-
-function updateIdentifier(node: IdentifierNode, text: string): IdentifierNode {
-  return {
-    ...node,
-    name: text ? text : null, // TODO: ensure that it's valid?
-  };
 }
 
 function updateExpression(node: ExpressionNode, text: string): HandlerResult {
@@ -235,60 +204,20 @@ function updateExpression(node: ExpressionNode, text: string): HandlerResult {
   if (FLOAT_REGEX.test(text)) {
     return [{
       type: 'IntegerLiteral',
-      uid: genuid(),
+      uid: node.uid,
+      identifier: node.identifier,
       value: Number(text),
     }, [], {text}];
   } else {
     return [{
       type: 'UndefinedExpression',
-      uid: genuid(),
+      uid: node.uid,
+      identifier: node.identifier,
     }, [], {text}];
   }
 }
 
 const HANDLERS: Handler[] = [
-  ['Assignment', ['MOVE_LEFT'], ({node, subpath, textEdit}) => {
-    if (textEdit) {
-      return;
-    }
-    if (equiv(subpath, ['expression'])) {
-      return [node, ['identifier'], null];
-    }
-    if (equiv(subpath, ['identifier'])) { // NOTE: Behave like ZOOM_OUT since unambiguous
-      return [node, [], null];
-    }
-  }],
-
-  ['Assignment', ['MOVE_RIGHT'], ({node, subpath, textEdit}) => {
-    if (textEdit) {
-      return;
-    }
-    if (equiv(subpath, ['identifier'])) {
-      return [node, ['expression'], null];
-    }
-    if (equiv(subpath, [])) { // NOTE: Behave like ZOOM_IN since unambiguous
-      return [node, ['identifier'], null];
-    }
-  }],
-
-  ['Assignment', ['ZOOM_IN'], ({node, subpath, textEdit}) => {
-    if (textEdit) {
-      return;
-    }
-    if (equiv(subpath, [])) {
-      return [node, ['identifier'], null];
-    }
-  }],
-
-  ['Assignment', ['ZOOM_OUT'], ({node, subpath, textEdit}) => {
-    if (textEdit) {
-      return;
-    }
-    if (equiv(subpath, ['identifier']) || equiv(subpath, ['expression'])) {
-      return [node, [], null];
-    }
-  }],
-
   ['Program', ['MOVE_UP', 'MOVE_DOWN'], ({node, subpath, textEdit, action}) => {
     if (!isProgramNode(node)) {
       throw new Error();
@@ -298,22 +227,20 @@ const HANDLERS: Handler[] = [
       return;
     }
 
-    // NOTE: This assumes that selection is on/in one of the assignments
-    const newAssignmentIdx = () => {
+    // NOTE: This assumes that selection is on/in one of the expressions
+    const newExpressionIdx = () => {
       const idx = subpath[1];
       if (typeof idx !== 'number') {
         throw new Error();
       }
       let newIdx = idx + ((action.type === 'MOVE_UP') ? -1 : 1);
       newIdx = Math.max(newIdx, 0);
-      newIdx = Math.min(newIdx, node.assignments.length-1);
+      newIdx = Math.min(newIdx, node.expressions.length-1);
       return newIdx;
     }
 
-    if ((subpath.length === 2) && (subpath[0] === 'assignments')) {
-      return [node, ['assignments', newAssignmentIdx()], null];
-    } else if ((subpath.length === 3) && (subpath[0] === 'assignments')) {
-      return [node, ['assignments', newAssignmentIdx(), subpath[2]], null];
+    if ((subpath.length === 2) && (subpath[0] === 'expressions')) {
+      return [node, ['expressions', newExpressionIdx()], null];
     }
   }],
 
@@ -321,7 +248,7 @@ const HANDLERS: Handler[] = [
     if (!isProgramNode(node)) {
       throw new Error();
     }
-    if ((subpath.length === 2) && (subpath[0] === 'assignments')) {
+    if (!textEdit && (subpath.length === 2) && (subpath[0] === 'expressions')) {
       if (textEdit) {
         throw new Error();
       }
@@ -329,19 +256,39 @@ const HANDLERS: Handler[] = [
       if (typeof(removeIdx) !== 'number') {
         throw new Error();
       }
-      return deleteAssignment(node, removeIdx);
+      return deleteExpression(node, removeIdx);
     }
   }],
 
-  ['Identifier', ['ENTER'], ({node, subpath, textEdit}) => {
-    if (!isIdentifierNode(node)) {
+  ['Expression', ['ENTER'], ({node, subpath, textEdit}) => {
+    if (!isExpressionNode(node)) {
       throw new Error();
     }
-    if (textEdit) {
-      return [node, subpath, null];
-    } else {
-      const nameText = node.name || '';
-      return [updateIdentifier(node, nameText), subpath, {text: nameText}];
+    if (equiv(subpath, ['identifier'])) {
+      if (!node.identifier) {
+        throw new Error();
+      }
+      if (textEdit) {
+        // Commit name
+        const trimmedName = node.identifier.name.trim();
+        if (trimmedName) {
+          return [{
+            ...node,
+            identifier: {
+              type: 'Identifier',
+              name: trimmedName,
+            },
+          }, [], null];
+        } else {
+          // If the name is empty (after trim), get rid of identifier node
+          return [{
+            ...node,
+            identifier: null,
+          }, [], null];
+        }
+      } else {
+        return [node, subpath, {text: node.identifier ? node.identifier.name : ''}];
+      }
     }
   }],
 
@@ -371,70 +318,41 @@ const HANDLERS: Handler[] = [
     if (!isProgramNode(node)) {
       throw new Error();
     }
-    if ((subpath.length >= 2) && (subpath[0] === 'assignments')) {
+    if ((subpath.length >= 2) && (subpath[0] === 'expressions')) {
       const afterIdx = subpath[1];
       if (typeof(afterIdx) !== 'number') {
         throw new Error();
       }
       const newNode: ProgramNode = {
         ...node,
-        assignments: [
-          ...node.assignments.slice(0, afterIdx+1),
+        expressions: [
+          ...node.expressions.slice(0, afterIdx+1),
           {
-            type: 'Assignment',
+            type: 'UndefinedExpression',
             uid: genuid(),
-            identifier: {
-              type: 'Identifier',
-              uid: genuid(),
-              name: null,
-            },
-            expression: {
-              type: 'UndefinedExpression',
-              uid: genuid(),
-            }
+            identifier: null,
           },
-          ...node.assignments.slice(afterIdx+1),
+          ...node.expressions.slice(afterIdx+1),
         ],
       };
-      return [newNode, ['assignments', afterIdx+1, 'identifier'], {text: ''}];
+      return [newNode, ['expressions', afterIdx+1], {text: ''}];
     }
   }],
 
   /**
-   * DELETE when editing the LHS of assignment will delete the assignment, if the input box is empty and the RHS is undefined.
-   * This is mainly to allow us to easily "undo" adding a new assignment by just hitting DELETE.
+   * DELETE when editing an expression at the top level will delete it, if there is no text.
+   * This is mainly to allow us to easily "undo" adding a new expression by just hitting DELETE.
    */
   ['Program', ['DELETE'], ({node, subpath, textEdit}) => {
     if (!isProgramNode(node)) {
       throw new Error();
     }
-    if ((subpath.length === 3) && (subpath[0] === 'assignments') && (subpath[2] === 'identifier') && textEdit && (textEdit.text === '')) {
+    if ((subpath.length === 2) && (subpath[0] === 'expressions') && textEdit && (textEdit.text === '')) {
       const removeIdx = subpath[1];
       if (typeof(removeIdx) !== 'number') {
         throw new Error();
       }
-      if (node.assignments[removeIdx].expression.type === 'UndefinedExpression') {
-        if (typeof(removeIdx) !== 'number') {
-          throw new Error();
-        }
-        return deleteAssignment(node, removeIdx);
-      }
-    }
-  }],
-
-  /**
-   * Typing a character on an identifier jumps straight into editing it (overwriting)
-   */
-  ['Identifier', ['CHAR'], ({node, subpath, textEdit, action}) => {
-    if (!isIdentifierNode(node)) {
-      throw new Error();
-    }
-    if (textEdit || subpath.length || !action.char) {
-      throw new Error();
-    }
-    // Space is not a "command character", but I don't think we want it to trigger the start of editing
-    if (action.char !== ' ') {
-      return [updateIdentifier(node, action.char), subpath, {text: action.char}];
+      return deleteExpression(node, removeIdx);
     }
   }],
 
@@ -455,21 +373,17 @@ const HANDLERS: Handler[] = [
   }],
 
   /**
-   * ASSIGN on an assignment will move to editing the RHS in many cases.
+   * NAME on an expression will move to editing identifer.
    */
-  ['Assignment', ['ASSIGN'], ({node, subpath, textEdit}) => {
-    if (!isAssignmentNode(node)) {
+  ['Expression', ['NAME'], ({node, subpath, textEdit}) => {
+    if (!isExpressionNode(node)) {
       throw new Error();
     }
-    if ((!textEdit && (equiv(subpath, []) || equiv(subpath, ['identifier']) || equiv(subpath, ['expression']))) ||
-    (textEdit && equiv(subpath, ['identifier']))) {
+    if (equiv(subpath, [])) {
       return [{
         ...node,
-        expression: {
-          type: 'UndefinedExpression',
-          uid: genuid(),
-        },
-      }, ['expression'], {text: ''}];
+        identifier: node.identifier ? node.identifier : {type: 'Identifier', name: ''},
+      }, ['identifier'], {text: node.identifier ? node.identifier.name : ''}];
     }
   }],
 
@@ -487,7 +401,7 @@ const HANDLERS: Handler[] = [
       throw new Error();
     }
 
-    return [updateIdentifier(node, action.text), subpath, {text: action.text}];
+    return [{...node, name: action.text}, subpath, {text: action.text}];
   }],
 
   ['Expression', ['SET_TEXT'], ({node, subpath, textEdit, action}) => {
@@ -535,6 +449,7 @@ const HANDLERS: Handler[] = [
             {
               type: 'UndefinedExpression',
               uid: genuid(),
+              identifier: null,
             }
           ],
         }, ['items', 0], null];
@@ -584,6 +499,7 @@ const HANDLERS: Handler[] = [
           {
             type: 'UndefinedExpression',
             uid: genuid(),
+            identifier: null,
           },
           ...node.items.slice(afterIdx+1),
         ],
@@ -609,7 +525,8 @@ const HANDLERS: Handler[] = [
           if (textEdit.text === '') {
             return [{
               type: 'UndefinedExpression',
-              uid: genuid(),
+              identifier: node.identifier,
+              uid: node.uid,
             }, [], {text: ''}];
           }
         } else {
@@ -653,9 +570,11 @@ const HANDLERS: Handler[] = [
       return [{
         type: 'ArrayLiteral',
         uid: genuid(),
+        identifier: null,
         items: [
           {
             type: 'UndefinedExpression',
+            identifier: null,
             uid: genuid(),
           }
         ],
@@ -844,126 +763,87 @@ export function reducer(state: State, action: Action): State {
 }
 
 export const initialState: State = {
-  // root: {
-  //   type: 'Program',
-  //   assignments: [],
-  // },
   root: {
     type: 'Program',
-    uid: genuid(),
-    assignments: [
+    expressions: [
       {
-        type: 'Assignment',
+        type: 'IntegerLiteral',
         uid: genuid(),
         identifier: {
           type: 'Identifier',
-          uid: genuid(),
           name: 'foo',
         },
-        expression: {
-          type: 'IntegerLiteral',
-          uid: genuid(),
-          value: 123,
-        }
+        value: 123,
       },
       {
-        type: 'Assignment',
+        type: 'IntegerLiteral',
+        uid: genuid(),
+        identifier: null,
+        value: 456,
+      },
+      {
+        type: 'IntegerLiteral',
         uid: genuid(),
         identifier: {
           type: 'Identifier',
-          uid: genuid(),
           name: 'bar',
         },
-        expression: {
-          type: 'IntegerLiteral',
-          uid: genuid(),
-          value: 456,
-        }
+        value: 789,
       },
       {
-        type: 'Assignment',
+        type: 'ArrayLiteral',
         uid: genuid(),
         identifier: {
           type: 'Identifier',
-          uid: genuid(),
-          name: 'baz',
+          name: 'an array literal',
         },
-        expression: {
-          type: 'IntegerLiteral',
-          uid: genuid(),
-          value: 789,
-        }
+        items: [
+          {
+            type: 'IntegerLiteral',
+            uid: genuid(),
+            identifier: null,
+            value: 123,
+          },
+          {
+            type: 'ArrayLiteral',
+            uid: genuid(),
+            identifier: {
+              type: 'Identifier',
+              name: 'nice subarray',
+            },
+                items: [
+              {
+                type: 'IntegerLiteral',
+                uid: genuid(),
+                identifier: null,
+                value: 345,
+              },
+              {
+                type: 'IntegerLiteral',
+                uid: genuid(),
+                identifier: null,
+                value: 456,
+              },
+            ],
+          },
+          {
+            type: 'IntegerLiteral',
+            uid: genuid(),
+            identifier: null,
+            value: 234,
+          },
+        ],
       },
       {
-        type: 'Assignment',
+        type: 'UndefinedExpression',
         uid: genuid(),
         identifier: {
           type: 'Identifier',
-          uid: genuid(),
-          name: null,
-        },
-        expression: {
-          type: 'IntegerLiteral',
-          uid: genuid(),
-          value: 4321,
-        }
-      },
-      {
-        type: 'Assignment',
-        uid: genuid(),
-        identifier: {
-          type: 'Identifier',
-          uid: genuid(),
-          name: 'blap',
-        },
-        expression: {
-          type: 'ArrayLiteral',
-          uid: genuid(),
-          items: [
-            {
-              type: 'IntegerLiteral',
-              uid: genuid(),
-              value: 123,
-            },
-            {
-              type: 'ArrayLiteral',
-              uid: genuid(),
-              items: [
-                {
-                  type: 'IntegerLiteral',
-                  uid: genuid(),
-                  value: 345,
-                },
-                {
-                  type: 'IntegerLiteral',
-                  uid: genuid(),
-                  value: 456,
-                },
-              ],
-            },
-            {
-              type: 'IntegerLiteral',
-              uid: genuid(),
-              value: 234,
-            },
-          ],
-        }
-      },
-      {
-        type: 'Assignment',
-        uid: genuid(),
-        identifier: {
-          type: 'Identifier',
-          uid: genuid(),
           name: 'quux',
         },
-        expression: {
-          type: 'UndefinedExpression',
-          uid: genuid(),
-        }
       },
     ]
   },
-  selectionPath: ['assignments', 0, 'identifier'],
+  selectionPath: ['expressions', 0],
   textEdit: null,
 };

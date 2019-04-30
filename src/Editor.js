@@ -17,7 +17,7 @@ const keyMap = {
   INSERT_AFTER: [';', ','],
 
   DELETE: 'backspace',
-  ASSIGN: '=',
+  NAME: '=',
   OPEN_ARRAY: '[',
   CLOSE_ARRAY: ']',
 
@@ -59,38 +59,21 @@ function TextEditInput() {
   return <div><input className="Editor-text-edit-input Editor-selected" value={textEdit.text} onChange={onChange} autoFocus /></div>
 }
 
-function Hole() {
-  return <div className="Editor-hole">&nbsp;</div>
-}
-
 function ProgramView({ program }) {
   return (
     <div className="Editor-program">
-      {program.assignments.map((assignment) => (
-        <AssignmentView assignment={assignment} key={assignment.uid} />
+      {program.expressions.map((expression) => (
+        <div className="Editor-program-expression" key={expression.uid}>
+          <ExpressionView expression={expression} />
+        </div>
       ))}
-    </div>
-  );
-}
-
-function AssignmentView({ assignment }) {
-  return (
-    <div className={useWithSelectedClass(assignment, 'Editor-assignment')}>
-      <IdentifierView identifier={assignment.identifier} />
-      <div>&nbsp;=&nbsp;</div>
-      <ExpressionView expression={assignment.expression} />
     </div>
   );
 }
 
 function NotEditingIdentifierView({ identifier }) {
   return (
-    <div className={useWithSelectedClass(identifier)}>
-      {(typeof identifier.name === 'string')
-        ? identifier.name
-        : <Hole />
-      }
-    </div>
+    <div className={useWithSelectedClass(identifier)}>{identifier.name}</div>
   );
 }
 
@@ -105,12 +88,12 @@ function IdentifierView({ identifier }) {
 }
 
 function IntegerLiteralView({ integerLiteral }) {
-  return <div className={useWithSelectedClass(integerLiteral)}>{integerLiteral.value}</div>;
+  return <div>{integerLiteral.value}</div>;
 }
 
 function ArrayLiteralView({ arrayLiteral }) {
   return (
-    <div className={useWithSelectedClass(arrayLiteral)}>
+    <div>
       <div>[</div>
       <div className="Editor-array-items">
         {arrayLiteral.items.map(item => (
@@ -123,7 +106,7 @@ function ArrayLiteralView({ arrayLiteral }) {
 }
 
 function UndefinedExpressionView({ undefinedExpression }) {
-  return <div className={useWithSelectedClass(undefinedExpression)}><Hole /></div>;
+  return <div className="Editor-undefined-expression">&nbsp;</div>;
 }
 
 function NotEditingExpressionView({ expression }) {
@@ -146,11 +129,20 @@ function ExpressionView({ expression }) {
   const selected = (expression === useContext(SelectedNodeContext));
   const textEdit = useContext(TextEditContext);
 
-  if (selected && textEdit) {
-    return <TextEditInput />
-  } else {
-    return <NotEditingExpressionView expression={expression} />
-  }
+  return (
+    <div className={useWithSelectedClass(expression, 'Editor-expression')}>
+      <div className="Editor-expression-main">
+        {(selected && textEdit)
+        ? <TextEditInput />
+        : <NotEditingExpressionView expression={expression} />
+        }
+      </div>
+      {expression.identifier
+        ? <div className="Editor-expression-identifier"><IdentifierView identifier={expression.identifier} /></div>
+        : null
+      }
+    </div>
+  );
 }
 
 export default function Editor({ autoFocus }) {

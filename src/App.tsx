@@ -15,20 +15,16 @@ const App: React.FC = () => {
           <li>There's no mouse/touch support yet, only keyboard.</li>
           <li>The AST always stays "well-formed", but some bits are allowed to be temporarily unspecified or invalid. The program may still be able to run with unspecified values, and it will be very clear to the user (red boxes) what is invalid/missing.</li>
           <li>This code doesn't yet "run", it's just a fake language for now.</li>
-          <li>Up/down arrows move up and down between assignments and array items.</li>
+          <li>Up/down arrows move up and down between expressions and array items.</li>
           <li>Shift-left (or just left, if unambiguous) "zooms out" selection and shift-right (Or just right, if unambiguous) "zooms in" selection (into nested structures).</li>
-          <li>If LHS of an assignment is selected, left arrow moves "out" to select the entire assignment.</li>
-          <li>Pressing enter on an identifier or number will begin editing it. Pressing enter again will stop editing.</li>
+          <li>Pressing enter on an expression (or sub-expression) will begin editing it. Pressing enter again will stop editing.</li>
           <li>Instead of pressing enter, you can just start typing letters/numbers and it will begin the edit (overwriting what it there).</li>
-          <li>Pressing the = key on the "top levels" of an assignment will beging editing the RHS.</li>
-          <li>A red box indicates an undefined identifer or expression.</li>
+          <li>Pressing the = key on on an expression will move to editing its name.</li>
+          <li>A red box indicates an undefined expression.</li>
           <li>If you enter an invalid number as an expression, it will ignore it and leave an undefined box.</li>
           <li>Semicolon or comma (interchangeable) will both add a new assignment or array item below the current one (even during a text edit).</li>
-          <li>When an entire assignment is selected, delete will delete it.</li>
+          <li>Delete will delete expressions, array items, etc.</li>
           <li>Pressing [ will create an array literal. Pressing ] when editing the last item is a shortcut to "close" the array.</li>
-          <li><strong>TODO</strong> Allow creating array literals.</li>
-          <li><strong>TODO</strong> Allow deleting array items.</li>
-          <li><strong>TODO</strong> Validate LHS identifiers.</li>
           <li><strong>TODO</strong> Escape will revert any in-progress edit.</li>
         </ul>
       </div>

@@ -29,21 +29,30 @@
   outline: rgb(0, 255, 0) solid 1px;
 }
 
-.Editor-hole {
+.Editor-undefined-expression {
   background: rgba(255, 0, 0, 0.75);
   padding: 0 1em;
 }
 
-.Editor-assignment {
-  padding: 1px 0;
+.Editor-program-expression {
+  padding: 0.2em 0;
+}
+
+.Editor-expression {
   display: flex;
-  align-items: flex-start;
+}
+
+.Editor-expression-identifier {
+  margin-left: 1em;
+  padding-left: 0.3em;
+  border-left: 1px solid #555;
+  color: #aaa;
 }
 
 .Editor-array-items {
   padding-left: 1em;
 }
 
-.Editor-program, .Editor-assignment, .Editor-array-item {
+.Editor-program, .Editor-program-expression, .Editor-array-item, .Editor-expression-identifier {
   width: fit-content;
 }
