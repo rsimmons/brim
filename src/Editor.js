@@ -63,7 +63,7 @@ function ProgramView({ program }) {
   return (
     <div className="Editor-program">
       {program.expressions.map((expression) => (
-        <div className="Editor-program-expression" key={expression.uid}>
+        <div className="Editor-program-expression" key={expression.streamId}>
           <ExpressionView expression={expression} />
         </div>
       ))}
@@ -97,7 +97,7 @@ function ArrayLiteralView({ arrayLiteral }) {
       <div>[</div>
       <div className="Editor-array-items">
         {arrayLiteral.items.map(item => (
-          <div className="Editor-array-item" key={item.uid}><ExpressionView expression={item} /></div>
+          <div className="Editor-array-item" key={item.streamId}><ExpressionView expression={item} /></div>
         ))}
       </div>
       <div>]</div>

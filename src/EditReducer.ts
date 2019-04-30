@@ -7,6 +7,8 @@ interface Action {
   char?: string;
 }
 
+type StreamID = string;
+
 interface ProgramNode {
   type: 'Program';
   expressions: ExpressionNode[];
@@ -30,7 +32,7 @@ function isExpressionNode(node: Node): node is ExpressionNode {
 
 interface UndefinedExpressionNode {
   type: 'UndefinedExpression';
-  uid: string;
+  streamId: StreamID;
   identifier: IdentifierNode | null;
 }
 function isUndefinedExpressionNode(node: Node): node is UndefinedExpressionNode {
@@ -39,7 +41,7 @@ function isUndefinedExpressionNode(node: Node): node is UndefinedExpressionNode 
 
 interface IntegerLiteralNode {
   type: 'IntegerLiteral';
-  uid: string;
+  streamId: StreamID;
   identifier: IdentifierNode | null;
   value: number;
 }
@@ -49,7 +51,7 @@ function isIntegerLiteralNode(node: Node): node is IntegerLiteralNode {
 
 interface ArrayLiteralNode {
   type: 'ArrayLiteral';
-  uid: string;
+  streamId: StreamID;
   identifier: IdentifierNode | null;
   items: ExpressionNode[];
 }
@@ -57,7 +59,16 @@ function isArrayLiteralNode(node: Node): node is ArrayLiteralNode {
   return node.type === 'ArrayLiteral';
 }
 
-type Node = ProgramNode | IdentifierNode | ExpressionNode;
+interface StreamReferenceNode {
+  type: 'StreamReference',
+  streamId: StreamID,
+  targetStreamId: StreamID,
+}
+function isStreamReferenceNode(node: Node): node is StreamReferenceNode {
+  return node.type === 'StreamReference';
+}
+
+type Node = ProgramNode | IdentifierNode | ExpressionNode | StreamReferenceNode;
 function isNode(node: any): node is Node {
   return isProgramNode(node) || isIdentifierNode(node) || isExpressionNode(node);
 }
@@ -98,14 +109,14 @@ const SCHEMA_NODES = {
 
   UndefinedExpression: {
     fields: {
-      uid: {type: 'uid'},
+      streamId: {type: 'uid'},
       identifier: {type: 'node'},
     }
   },
 
   IntegerLiteral: {
     fields: {
-      uid: {type: 'uid'},
+      streamId: {type: 'uid'},
       identifier: {type: 'node'},
       value: {type: 'value'},
     }
@@ -113,9 +124,16 @@ const SCHEMA_NODES = {
 
   ArrayLiteral: {
     fields: {
-      uid: {type: 'uid'},
+      streamId: {type: 'uid'},
       identifier: {type: 'node'},
       items: {type: 'nodes'},
+    }
+  },
+
+  StreamReference: {
+    fields: {
+      streamId: {type: 'uid'},
+      targetStreamId: {type: 'uid'},
     }
   },
 };
@@ -191,7 +209,7 @@ function deleteExpression(node: ProgramNode, removeIdx: number): [ProgramNode, P
     // We've deleted all expressions, so make a single empty one.
     newNode.expressions.push({
       type: 'UndefinedExpression',
-      uid: genuid(),
+      streamId: genuid(),
       identifier: null,
     });
     return [newNode, ['expressions', 0], {text: ''}];
@@ -204,14 +222,14 @@ function updateExpression(node: ExpressionNode, text: string): HandlerResult {
   if (FLOAT_REGEX.test(text)) {
     return [{
       type: 'IntegerLiteral',
-      uid: node.uid,
+      streamId: node.streamId,
       identifier: node.identifier,
       value: Number(text),
     }, [], {text}];
   } else {
     return [{
       type: 'UndefinedExpression',
-      uid: node.uid,
+      streamId: node.streamId,
       identifier: node.identifier,
     }, [], {text}];
   }
@@ -329,7 +347,7 @@ const HANDLERS: Handler[] = [
           ...node.expressions.slice(0, afterIdx+1),
           {
             type: 'UndefinedExpression',
-            uid: genuid(),
+            streamId: genuid(),
             identifier: null,
           },
           ...node.expressions.slice(afterIdx+1),
@@ -448,7 +466,7 @@ const HANDLERS: Handler[] = [
           items: [
             {
               type: 'UndefinedExpression',
-              uid: genuid(),
+              streamId: genuid(),
               identifier: null,
             }
           ],
@@ -498,7 +516,7 @@ const HANDLERS: Handler[] = [
           ...node.items.slice(0, afterIdx+1),
           {
             type: 'UndefinedExpression',
-            uid: genuid(),
+            streamId: genuid(),
             identifier: null,
           },
           ...node.items.slice(afterIdx+1),
@@ -526,7 +544,7 @@ const HANDLERS: Handler[] = [
             return [{
               type: 'UndefinedExpression',
               identifier: node.identifier,
-              uid: node.uid,
+              streamId: node.streamId,
             }, [], {text: ''}];
           }
         } else {
@@ -569,13 +587,13 @@ const HANDLERS: Handler[] = [
     if ((subpath.length === 0) && (!textEdit || (textEdit.text === ''))) {
       return [{
         type: 'ArrayLiteral',
-        uid: genuid(),
+        streamId: genuid(),
         identifier: null,
         items: [
           {
             type: 'UndefinedExpression',
             identifier: null,
-            uid: genuid(),
+            streamId: genuid(),
           }
         ],
       }, ['items', 0], {text: ''}];
@@ -768,7 +786,7 @@ export const initialState: State = {
     expressions: [
       {
         type: 'IntegerLiteral',
-        uid: genuid(),
+        streamId: genuid(),
         identifier: {
           type: 'Identifier',
           name: 'foo',
@@ -777,13 +795,13 @@ export const initialState: State = {
       },
       {
         type: 'IntegerLiteral',
-        uid: genuid(),
+        streamId: genuid(),
         identifier: null,
         value: 456,
       },
       {
         type: 'IntegerLiteral',
-        uid: genuid(),
+        streamId: genuid(),
         identifier: {
           type: 'Identifier',
           name: 'bar',
@@ -792,7 +810,7 @@ export const initialState: State = {
       },
       {
         type: 'ArrayLiteral',
-        uid: genuid(),
+        streamId: genuid(),
         identifier: {
           type: 'Identifier',
           name: 'an array literal',
@@ -800,13 +818,13 @@ export const initialState: State = {
         items: [
           {
             type: 'IntegerLiteral',
-            uid: genuid(),
+            streamId: genuid(),
             identifier: null,
             value: 123,
           },
           {
             type: 'ArrayLiteral',
-            uid: genuid(),
+            streamId: genuid(),
             identifier: {
               type: 'Identifier',
               name: 'nice subarray',
@@ -814,13 +832,13 @@ export const initialState: State = {
                 items: [
               {
                 type: 'IntegerLiteral',
-                uid: genuid(),
+                streamId: genuid(),
                 identifier: null,
                 value: 345,
               },
               {
                 type: 'IntegerLiteral',
-                uid: genuid(),
+                streamId: genuid(),
                 identifier: null,
                 value: 456,
               },
@@ -828,7 +846,7 @@ export const initialState: State = {
           },
           {
             type: 'IntegerLiteral',
-            uid: genuid(),
+            streamId: genuid(),
             identifier: null,
             value: 234,
           },
@@ -836,7 +854,7 @@ export const initialState: State = {
       },
       {
         type: 'UndefinedExpression',
-        uid: genuid(),
+        streamId: genuid(),
         identifier: {
           type: 'Identifier',
           name: 'quux',
