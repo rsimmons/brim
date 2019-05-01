@@ -24,7 +24,7 @@ const App: React.FC = () => {
           <li>If you enter an invalid number as an expression, it will ignore it and leave an undefined box.</li>
           <li>Semicolon or comma (interchangeable) will both add a new assignment or array item below the current one (even during a text edit).</li>
           <li>Delete will delete expressions, array items, etc.</li>
-          <li>Pressing [ will create an array literal. Pressing ] when editing the last item is a shortcut to "close" the array.</li>
+          <li>Typeing just [ when editing an expression will create an array literal.</li>
           <li><strong>TODO</strong> Escape will revert any in-progress edit.</li>
         </ul>
       </div>
