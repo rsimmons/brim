@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useRef, useEffect, useState } from 'react';
 import { HotKeys, ObserveKeys } from "react-hotkeys";
 import { initialState, reducer, nodeFromPath } from './EditReducer';
+import ExpressionChooser from './ExpressionChooser';
 import './Editor.css';
 
 const keyMap = {
@@ -12,27 +13,21 @@ const keyMap = {
   ZOOM_IN: 'shift+right',
   ZOOM_OUT: 'shift+left',
 
-  ENTER: 'enter', // could the command be TOGGLE_EDIT?
+  BEGIN_EDIT: 'enter',
 
   INSERT_AFTER: [';', ','],
 
   DELETE: 'backspace',
   NAME: '=',
-  OPEN_ARRAY: '[',
-  CLOSE_ARRAY: ']',
-
-/*
-  CANCEL_EDIT: 'escape',
-*/
 };
 
-// "Regular" (printable, basically) characters that are used as commands
+// "Regular" (printable, basically) characters that are used as commands.
+// We want to handle them as commands even if they happen in an input element,
+// and we don't want them to trigger an edit to begin.
 const COMMAND_CHARS = [
   '=',
   ';',
   ',',
-  '[',
-  ']',
 ];
 
 const DispatchContext = createContext();
@@ -43,21 +38,7 @@ function useWithSelectedClass(obj, cns = '') {
   return (obj === selectedNode) ? (cns + ' Editor-selected') : cns;
 }
 
-const TextEditContext = createContext();
-
-function TextEditInput() {
-  const dispatch = useContext(DispatchContext);
-  const textEdit = useContext(TextEditContext);
-
-  const onChange = e => {
-    dispatch({
-      type: 'SET_TEXT',
-      text: e.target.value,
-    });
-  };
-
-  return <div><input className="Editor-text-edit-input Editor-selected" value={textEdit.text} onChange={onChange} autoFocus /></div>
-}
+const EditingSelectedContext = createContext();
 
 function ProgramView({ program }) {
   return (
@@ -71,20 +52,85 @@ function ProgramView({ program }) {
   );
 }
 
-function NotEditingIdentifierView({ identifier }) {
-  return (
-    <div className={useWithSelectedClass(identifier)}>{identifier.name}</div>
-  );
+function IdentifierChooser({ initialName, onUpdateName, onEndEdit }) {
+  const [text, setText] = useState(initialName || '');
+
+  const handleChange = e => {
+    const newText = e.target.value;
+    setText(newText);
+    if (onUpdateName) {
+      onUpdateName(newText);
+    }
+  };
+
+  const handleKeyDown = e => {
+    switch (e.key) {
+      case 'Enter':
+        e.stopPropagation();
+        if (onEndEdit) {
+          onEndEdit();
+        }
+        break;
+
+      default:
+        // do nothing
+        break;
+    }
+  };
+
+/*
+        // Commit name
+        const trimmedName = node.identifier.name.trim();
+        if (trimmedName) {
+          return [{
+            ...node,
+            identifier: {
+              type: 'Identifier',
+              name: trimmedName,
+            },
+          }, [], null];
+        } else {
+          // If the name is empty (after trim), get rid of identifier node
+          return [{
+            ...node,
+            identifier: null,
+          }, [], null];
+        }
+*/
+
+  return <div><input className="Editor-text-edit-input" value={text} onChange={handleChange} onKeyDown={handleKeyDown} autoFocus /></div>
 }
 
-function IdentifierView({ identifier }) {
+function NotEditingIdentifierView({ identifier }) {
+  return identifier.name;
+}
+
+function ExpressionIdentifierView({ expression }) {
+  const identifier = expression.identifier;
   const selected = (identifier === useContext(SelectedNodeContext));
-  const textEdit = useContext(TextEditContext);
-  if (selected && textEdit) {
-    return <TextEditInput />
-  } else {
-    return <NotEditingIdentifierView identifier={identifier} />
-  }
+  const editingSelected = useContext(EditingSelectedContext);
+  const dispatch = useContext(DispatchContext);
+
+  const handleUpdateName = (name) => {
+    dispatch({
+      type: 'UPDATE_NODE',
+      newNode: {
+        type: 'Identifier',
+        name,
+      },
+    });
+  };
+
+  const handleEndEdit = () => {
+    dispatch({type: 'END_EXPRESSION_IDENTIFIER_EDIT'});
+  };
+
+  return (
+    <div className={useWithSelectedClass(identifier)}>{(selected && editingSelected)
+      ? <IdentifierChooser initialName={identifier.name} onUpdateName={handleUpdateName} onEndEdit={handleEndEdit} />
+      : <NotEditingIdentifierView identifier={identifier} />
+    }</div>
+  );
 }
 
 function IntegerLiteralView({ integerLiteral }) {
@@ -127,18 +173,19 @@ function NotEditingExpressionView({ expression }) {
 
 function ExpressionView({ expression }) {
   const selected = (expression === useContext(SelectedNodeContext));
-  const textEdit = useContext(TextEditContext);
+  const editingSelected = useContext(EditingSelectedContext);
+  const dispatch = useContext(DispatchContext);
 
   return (
     <div className={useWithSelectedClass(expression, 'Editor-expression')}>
       <div className="Editor-expression-main">
-        {(selected && textEdit)
-        ? <TextEditInput />
+        {(selected && editingSelected)
+        ? <ExpressionChooser node={expression} dispatch={dispatch} />
         : <NotEditingExpressionView expression={expression} />
         }
       </div>
       {expression.identifier
-        ? <div className="Editor-expression-identifier"><IdentifierView identifier={expression.identifier} /></div>
+        ? <div className="Editor-expression-identifier"><ExpressionIdentifierView expression={expression} /></div>
         : null
       }
     </div>
@@ -161,52 +208,41 @@ export default function Editor({ autoFocus }) {
 
   // Restore focus to editor elem if input box just went away.
   // NOTE: This is hacky, but don't know better way to handle.
-  const previouslyTextEditing = useRef(false);
+  const previouslyEditingSelected = useRef(false);
   useEffect(() => {
-    const textEditing = !!state.textEdit;
-    if (previouslyTextEditing.current && !textEditing) {
+    if (previouslyEditingSelected.current && !state.editingSelected) {
       editorElem.current.focus();
     }
-    previouslyTextEditing.current = textEditing;
+    previouslyEditingSelected.current = state.editingSelected;
   });
 
   // TODO: memoize generation of this
   const handlers = {};
   for (const k of Object.keys(keyMap)) {
     handlers[k] = (() => (e) => {
-      if ((e.target.tagName.toLowerCase() !== 'input') || (COMMAND_CHARS.includes(e.key))) {
-        // NOTE: This is important, otherwise keys like '=' will go into the input element
-        e.preventDefault();
-      }
+      e.preventDefault(); // If we attempted to handle this, prevent default (scrolling window, entering character, etc.)
       dispatch({type: k});
     })(); // IIFE to bind k
   }
 
   const onKeyDown = e => {
-    if (e.target.tagName.toLowerCase() === 'input') {
-      // Ignore if this came from an input box
-      return;
-    }
     // TODO: This is not a robust check, but the spec is complicated
     // (https://www.w3.org/TR/uievents-key/#keys-whitespace)
-    if (([...e.key].length === 1) && !e.altkey && !e.ctrlKey && !e.metaKey && !COMMAND_CHARS.includes(e.key)) {
-      e.preventDefault(); // If we generate a CHAR action, then don't also allow default
-      dispatch({
-        type: 'CHAR',
-        char: e.key,
-      });
+    if ((e.target.tagName.toLowerCase() !== 'input') && ([...e.key].length === 1) && !e.altkey && !e.ctrlKey && !e.metaKey && !COMMAND_CHARS.includes(e.key)) {
+      // Interestingly, the key here will still end up going into the input element, which is what we want.
+      dispatch({type: 'BEGIN_EDIT_FRESH'});
     }
   };
 
   return (
     <HotKeys keyMap={keyMap} handlers={handlers}>
-      <ObserveKeys>
+      <ObserveKeys only={COMMAND_CHARS}>
         <div className="Editor" onKeyDown={onKeyDown} tabIndex="0" ref={editorElem}>
           <DispatchContext.Provider value={dispatch}>
             <SelectedNodeContext.Provider value={nodeFromPath(state.root, state.selectionPath)}>
-              <TextEditContext.Provider value={state.textEdit}>
+              <EditingSelectedContext.Provider value={state.editingSelected}>
                 <ProgramView program={state.root} />
-              </TextEditContext.Provider>
+              </EditingSelectedContext.Provider>
             </SelectedNodeContext.Provider>
           </DispatchContext.Provider>
         </div>
