@@ -1,6 +1,37 @@
 import React, { useState } from 'react';
+import './ExpressionChooser.css';
 
 const FLOAT_REGEX = /^[-+]?(?:\d*\.?\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?$/;
+
+function generateChoices(text) {
+  if (FLOAT_REGEX.test(text)) {
+    return [
+      {
+        type: 'number',
+        value: Number(text),
+      }
+    ];
+  } else {
+    return [
+      {
+        type: 'undefined',
+      }
+    ];
+  }
+}
+
+function Choice({ choice }) {
+  switch (choice.type) {
+    case 'undefined':
+      return <em>undefined</em>
+
+    case 'number':
+    return <span>{choice.value}</span>
+
+    default:
+      throw new Error();
+  }
+}
 
 export default function ExpressionChooser({ node, dispatch }) {
   const [text, setText] = useState(() => {
@@ -17,33 +48,67 @@ export default function ExpressionChooser({ node, dispatch }) {
     }
   });
 
+  // Update the expression node to reflect the current choice
+  const realizeChoice = (state) => {
+    const choice = state.choices[state.index];
+
+    let newNode;
+    switch (choice.type) {
+      case 'undefined':
+        newNode = {
+          type: 'UndefinedExpression',
+        }
+        break;
+
+      case 'number':
+        newNode = {
+          type: 'IntegerLiteral',
+          value: choice.value,
+        };
+        break;
+
+      default:
+        throw new Error();
+    }
+
+    newNode.streamId = node.streamId;
+    newNode.identifier = node.identifier;
+
+    dispatch({type: 'UPDATE_NODE', newNode});
+  };
+
+  const recomputeDropdownChoices = (text) => {
+    const newState = {
+      choices: generateChoices(text),
+      index: 0, // reset index to 0
+    };
+    realizeChoice(newState);
+    return newState;
+  };
+
+  const adjustDropdownIndex = (amount) => {
+    setDropdownState(oldState => {
+      const newState = {
+        ...oldState,
+        index: (oldState.index + amount + oldState.choices.length) % oldState.choices.length,
+      };
+      realizeChoice(newState);
+      return newState;
+    });
+  };
+
+  const [dropdownState, setDropdownState] = useState(() => recomputeDropdownChoices(text));
+
   const onChange = e => {
     const newText = e.target.value;
 
-    setText(newText);
-
     if (newText === '[') {
+      // This is a special case, we bypass the normal dropdown/choice stuff
       dispatch({type: 'END_EXPRESSION_EDIT'});
       dispatch({type: 'CREATE_ARRAY'});
-    } else if (FLOAT_REGEX.test(newText)) {
-      dispatch({
-        type: 'UPDATE_NODE',
-        newNode: {
-          type: 'IntegerLiteral',
-          streamId: node.streamId,
-          identifier: node.identifier,
-          value: Number(newText),
-        },
-      });
     } else {
-      dispatch({
-        type: 'UPDATE_NODE',
-        newNode: {
-          type: 'UndefinedExpression',
-          streamId: node.streamId,
-          identifier: node.identifier,
-        },
-      });
+      setText(newText);
+      setDropdownState(recomputeDropdownChoices(newText));
     }
   };
 
@@ -61,11 +126,32 @@ export default function ExpressionChooser({ node, dispatch }) {
         }
         break;
 
+      case 'ArrowUp':
+        e.stopPropagation();
+        e.preventDefault();
+        adjustDropdownIndex(-1);
+        break;
+
+      case 'ArrowDown':
+        e.stopPropagation();
+        e.preventDefault();
+        adjustDropdownIndex(1);
+        break;
+
       default:
         // do nothing
         break;
     }
   };
 
-  return <div><input className="Editor-text-edit-input" value={text} onChange={onChange} onKeyDown={onKeyDown} autoFocus /></div>
+  return (
+    <div>
+      <input className="Editor-text-edit-input" value={text} onChange={onChange} onKeyDown={onKeyDown} autoFocus />
+      <ul className="ExpressionChooser-dropdown">
+        {dropdownState.choices.map((choice, idx) =>
+          <li key={idx} className={(idx === dropdownState.index) ? 'ExpressionChooser-dropdown-selected' : ''}><Choice choice={choice} /></li>
+        )}
+      </ul>
+    </div>
+  );
 }
