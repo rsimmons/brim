@@ -78,26 +78,6 @@ function IdentifierChooser({ initialName, onUpdateName, onEndEdit }) {
     }
   };
 
-/*
-        // Commit name
-        const trimmedName = node.identifier.name.trim();
-        if (trimmedName) {
-          return [{
-            ...node,
-            identifier: {
-              type: 'Identifier',
-              name: trimmedName,
-            },
-          }, [], null];
-        } else {
-          // If the name is empty (after trim), get rid of identifier node
-          return [{
-            ...node,
-            identifier: null,
-          }, [], null];
-        }
-*/
-
   return <div><input className="Editor-text-edit-input" value={text} onChange={handleChange} onKeyDown={handleKeyDown} autoFocus /></div>
 }
 
