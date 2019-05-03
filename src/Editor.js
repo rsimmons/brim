@@ -191,7 +191,6 @@ function ExpressionView({ expression }) {
 export default function Editor({ autoFocus }) {
   const [plainState, dispatch] = useReducer(reducer, initialState);
   const state = addDerivedState(plainState);
-  console.log(state);
 
   const editorElem = useRef();
 
