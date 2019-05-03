@@ -1,13 +1,85 @@
 import React, { useState } from 'react';
 import './ExpressionChooser.css';
+import { fuzzy_match } from './vendor/fts_fuzzy_match';
+
+/*
+export default class NodePool {
+  constructor() {
+    // Build pool
+    this.pool = [];
+    for (const k in nodeDefs) {
+      this.pool.push({
+        id: k,
+        def: nodeDefs[k],
+      });
+    }
+
+    // Sort alphabetically for now since we have no other relevance signals
+    this.pool.sort((a, b) => {
+      const sa = a.id.toUpperCase();
+      const sb = b.id.toUpperCase();
+      if (sa < sb) {
+        return -1;
+      }
+      if (sa > sb) {
+        return 1;
+      }
+      return 0;
+    });
+  }
+
+  lookup(id) {
+    return nodeDefs[id];
+  }
+
+  search(query) {
+    const results = [];
+    for (const node of this.pool) {
+      const [hit, score, formattedStr] = fuzzy_match(query, node.id);
+      if (hit) {
+        results.push({
+          score,
+          formattedStr,
+          node,
+        });
+      }
+    }
+    if (query !== '') { // TOOD: this is a hack, is query is empty, scoring is dumb
+      results.sort((a, b) => (b.score - a.score));
+    }
+    return results;
+  }
+}
+*/
+
+function fuzzySearchNames(query, names) {
+  const results = [];
+
+  for (const name of names) {
+    const [hit, score, formattedStr] = fuzzy_match(query, name);
+    if (hit) {
+      results.push({
+        score,
+        formattedStr,
+        name,
+      });
+    }
+  }
+  if (query !== '') { // TOOD: this is a hack, is query is empty, scoring is dumb
+    results.sort((a, b) => (b.score - a.score));
+  }
+  return results;
+}
 
 const FLOAT_REGEX = /^[-+]?(?:\d*\.?\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?$/;
 
-function generateChoices(text, environment) {
+function generateChoices(text, mainState) {
   const choices = [];
 
-  if (environment.nameToNodes.has(text)) {
-    const nodes = environment.nameToNodes.get(text);
+  const envNames = mainState.nameToNodes.keys();
+  const envSearchResults = fuzzySearchNames(text, envNames);
+  for (const result of envSearchResults) {
+    const nodes = mainState.nameToNodes.get(result.name);
     for (const node of nodes) {
       choices.push({
         type: 'streamref',
@@ -48,7 +120,7 @@ function Choice({ choice }) {
   }
 }
 
-export default function ExpressionChooser({ node, environment, dispatch }) {
+export default function ExpressionChooser({ node, mainState, dispatch }) {
   const [text, setText] = useState(() => {
     // Initialize text based on existing node
     switch (node.type) {
@@ -57,6 +129,11 @@ export default function ExpressionChooser({ node, environment, dispatch }) {
 
       case 'IntegerLiteral':
         return node.value.toString();
+
+      case 'StreamReference': {
+        const targetExpressionNode = mainState.streamIdToNode.get(node.targetStreamId);
+        return targetExpressionNode.identifier ? targetExpressionNode.identifier.name : '';
+      }
 
       default:
         throw new Error();
@@ -101,7 +178,7 @@ export default function ExpressionChooser({ node, environment, dispatch }) {
 
   const recomputeDropdownChoices = (text) => {
     const newState = {
-      choices: generateChoices(text, environment),
+      choices: generateChoices(text, mainState),
       index: 0, // reset index to 0
     };
     realizeChoice(newState);

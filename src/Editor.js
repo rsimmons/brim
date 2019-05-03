@@ -165,18 +165,14 @@ function NotEditingExpressionView({ expression }) {
 
 function ExpressionView({ expression }) {
   const selected = (expression === useContext(SelectedNodeContext));
-  const {editingSelected, nameToNodes} = useContext(FullStateContext);
+  const mainState = useContext(FullStateContext);
   const dispatch = useContext(DispatchContext);
-
-  const environment = {
-    nameToNodes,
-  };
 
   return (
     <div className={useWithSelectedClass(expression, 'Editor-expression')}>
       <div className="Editor-expression-main">
-        {(selected && editingSelected)
-        ? <ExpressionChooser node={expression} environment={environment} dispatch={dispatch} />
+        {(selected && mainState.editingSelected)
+        ? <ExpressionChooser node={expression} mainState={mainState} dispatch={dispatch} />
         : <NotEditingExpressionView expression={expression} />
         }
       </div>
