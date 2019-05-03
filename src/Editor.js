@@ -38,7 +38,7 @@ function useWithSelectedClass(obj, cns = '') {
   return (obj === selectedNode) ? (cns + ' Editor-selected') : cns;
 }
 
-const EditingSelectedContext = createContext();
+const FullStateContext = createContext();
 
 function ProgramView({ program }) {
   return (
@@ -88,7 +88,7 @@ function NotEditingIdentifierView({ identifier }) {
 function ExpressionIdentifierView({ expression }) {
   const identifier = expression.identifier;
   const selected = (identifier === useContext(SelectedNodeContext));
-  const editingSelected = useContext(EditingSelectedContext);
+  const {editingSelected} = useContext(FullStateContext);
   const dispatch = useContext(DispatchContext);
 
   const handleUpdateName = (name) => {
@@ -135,6 +135,15 @@ function UndefinedExpressionView({ undefinedExpression }) {
   return <div className="Editor-undefined-expression">&nbsp;</div>;
 }
 
+function StreamReferenceView({ streamReference }) {
+  const {streamMap} = useContext(FullStateContext);
+  const targetExpressionNode = streamMap.get(streamReference.targetStreamId);
+  if (!targetExpressionNode) {
+    throw new Error();
+  }
+  return <div>{(targetExpressionNode.identifier && targetExpressionNode.identifier.name) ? targetExpressionNode.identifier.name : '<stream>'}</div>
+}
+
 function NotEditingExpressionView({ expression }) {
   switch (expression.type) {
     case 'IntegerLiteral':
@@ -146,6 +155,9 @@ function NotEditingExpressionView({ expression }) {
     case 'UndefinedExpression':
       return <UndefinedExpressionView undefinedExpression={expression} />
 
+    case 'StreamReference':
+      return <StreamReferenceView streamReference={expression} />
+
     default:
       throw new Error();
   }
@@ -153,7 +165,7 @@ function NotEditingExpressionView({ expression }) {
 
 function ExpressionView({ expression }) {
   const selected = (expression === useContext(SelectedNodeContext));
-  const editingSelected = useContext(EditingSelectedContext);
+  const {editingSelected} = useContext(FullStateContext);
   const dispatch = useContext(DispatchContext);
 
   return (
@@ -220,9 +232,9 @@ export default function Editor({ autoFocus }) {
         <div className="Editor" onKeyDown={onKeyDown} tabIndex="0" ref={editorElem}>
           <DispatchContext.Provider value={dispatch}>
             <SelectedNodeContext.Provider value={nodeFromPath(state.root, state.selectionPath)}>
-              <EditingSelectedContext.Provider value={state.editingSelected}>
+              <FullStateContext.Provider value={state}>
                 <ProgramView program={state.root} />
-              </EditingSelectedContext.Provider>
+              </FullStateContext.Provider>
             </SelectedNodeContext.Provider>
           </DispatchContext.Provider>
         </div>

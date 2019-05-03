@@ -89,6 +89,7 @@ interface State {
   root: ProgramNode;
   selectionPath: Path;
   editingSelected: boolean;
+  streamMap: Map<StreamID, Node>;
 }
 
 const SCHEMA_NODES = {
@@ -595,6 +596,37 @@ function recursiveReducer(state: State, node: Node, action: Action): (null | [No
   return null;
 }
 
+function recursiveBuildStreamMap(node: Node, map: Map<StreamID, Node>): void {
+  if (SCHEMA_CLASSES['Expression'].includes(node.type)) {
+    if (!isExpressionNode(node)) {
+      throw new Error();
+    }
+    map.set(node.streamId, node);
+    return;
+  }
+
+  switch (node.type) {
+    case 'Program':
+      for (const expression of node.expressions) {
+        recursiveBuildStreamMap(expression, map);
+      }
+      break;
+
+      default:
+        throw new Error();
+  }
+}
+
+function addDerivedState(state: State): State {
+  const streamMap: Map<StreamID, Node> = new Map();
+  recursiveBuildStreamMap(state.root, streamMap);
+
+  return {
+    ...state,
+    streamMap,
+  }
+}
+
 export function reducer(state: State, action: Action): State {
   console.log('action', action.type);
 
@@ -628,24 +660,26 @@ export function reducer(state: State, action: Action): State {
       throw new Error();
     }
 
-    return {
+    return addDerivedState({
       root: newRoot,
       selectionPath: newSelectionPath,
       editingSelected: newEditingSelected,
-    };
+      streamMap: new Map(), // TODO: Do we need a separate type for state without derived stuff?
+    });
   } else {
     console.log('not handled');
     return state;
   }
 }
 
-export const initialState: State = {
+const fooId = genuid();
+export const initialState: State = addDerivedState({
   root: {
     type: 'Program',
     expressions: [
       {
         type: 'IntegerLiteral',
-        streamId: genuid(),
+        streamId: fooId,
         identifier: {
           type: 'Identifier',
           name: 'foo',
@@ -719,8 +753,15 @@ export const initialState: State = {
           name: 'quux',
         },
       },
+      {
+        type: 'StreamReference',
+        streamId: genuid(),
+        identifier: null,
+        targetStreamId: fooId,
+      },
     ]
   },
   selectionPath: ['expressions', 0],
   editingSelected: false,
-};
+  streamMap: new Map(), // TODO: Do we need a separate type for state without derived stuff?
+});
