@@ -89,7 +89,6 @@ interface State {
   root: ProgramNode;
   selectionPath: Path;
   editingSelected: boolean;
-  streamMap: Map<StreamID, Node>;
 }
 
 const SCHEMA_NODES = {
@@ -612,18 +611,8 @@ function recursiveBuildStreamMap(node: Node, map: Map<StreamID, Node>): void {
       }
       break;
 
-      default:
-        throw new Error();
-  }
-}
-
-function addDerivedState(state: State): State {
-  const streamMap: Map<StreamID, Node> = new Map();
-  recursiveBuildStreamMap(state.root, streamMap);
-
-  return {
-    ...state,
-    streamMap,
+    default:
+      throw new Error();
   }
 }
 
@@ -640,20 +629,29 @@ export function reducer(state: State, action: Action): State {
       throw new Error();
     }
 
-    return addDerivedState({
+    return {
       root: newRoot,
       selectionPath: newSelectionPath,
       editingSelected: newEditingSelected,
-      streamMap: new Map(), // TODO: Do we need a separate type for state without derived stuff?
-    });
+    };
   } else {
     console.log('not handled');
     return state;
   }
 }
 
+export function addDerivedState(state: State) {
+  const streamMap: Map<StreamID, Node> = new Map();
+  recursiveBuildStreamMap(state.root, streamMap);
+
+  return {
+    ...state,
+    streamMap,
+  }
+}
+
 const fooId = genuid();
-export const initialState: State = addDerivedState({
+export const initialState: State = {
   root: {
     type: 'Program',
     expressions: [
@@ -743,5 +741,4 @@ export const initialState: State = addDerivedState({
   },
   selectionPath: ['expressions', 0],
   editingSelected: false,
-  streamMap: new Map(), // TODO: Do we need a separate type for state without derived stuff?
-});
+};

@@ -3,7 +3,7 @@ import './ExpressionChooser.css';
 
 const FLOAT_REGEX = /^[-+]?(?:\d*\.?\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?$/;
 
-function generateChoices(text) {
+function generateChoices(text, environment) {
   if (FLOAT_REGEX.test(text)) {
     return [
       {
@@ -26,14 +26,14 @@ function Choice({ choice }) {
       return <em>undefined</em>
 
     case 'number':
-    return <span>{choice.value}</span>
+      return <span>{choice.value}</span>
 
     default:
       throw new Error();
   }
 }
 
-export default function ExpressionChooser({ node, dispatch }) {
+export default function ExpressionChooser({ node, environment, dispatch }) {
   const [text, setText] = useState(() => {
     // Initialize text based on existing node
     switch (node.type) {
@@ -79,7 +79,7 @@ export default function ExpressionChooser({ node, dispatch }) {
 
   const recomputeDropdownChoices = (text) => {
     const newState = {
-      choices: generateChoices(text),
+      choices: generateChoices(text, environment),
       index: 0, // reset index to 0
     };
     realizeChoice(newState);
