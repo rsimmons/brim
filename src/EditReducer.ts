@@ -595,24 +595,49 @@ function recursiveReducer(state: State, node: Node, action: Action): (null | [No
   return null;
 }
 
-function recursiveBuildStreamMap(node: Node, map: Map<StreamID, Node>): void {
+function recursiveBuildStreamMaps(node: Node, streamIdToNode: Map<StreamID, Node>, nameToNodes: Map<string, Node[]>): void {
   if (SCHEMA_CLASSES['Expression'].includes(node.type)) {
     if (!isExpressionNode(node)) {
       throw new Error();
     }
-    map.set(node.streamId, node);
+
+    streamIdToNode.set(node.streamId, node);
+
+    if (node.identifier) {
+      const name = node.identifier.name;
+      let nodes = nameToNodes.get(name);
+      if (nodes) {
+        nodes.push(node);
+      } else {
+        nameToNodes.set(name, [node]);
+      }
+    }
+
     return;
   }
 
   switch (node.type) {
     case 'Program':
       for (const expression of node.expressions) {
-        recursiveBuildStreamMap(expression, map);
+        recursiveBuildStreamMaps(expression, streamIdToNode, nameToNodes);
       }
       break;
 
     default:
       throw new Error();
+  }
+}
+
+export function addDerivedState(state: State) {
+  const streamIdToNode: Map<StreamID, Node> = new Map();
+  const nameToNodes: Map<string, Node[]> = new Map();
+
+  recursiveBuildStreamMaps(state.root, streamIdToNode, nameToNodes);
+
+  return {
+    ...state,
+    streamIdToNode,
+    nameToNodes,
   }
 }
 
@@ -637,16 +662,6 @@ export function reducer(state: State, action: Action): State {
   } else {
     console.log('not handled');
     return state;
-  }
-}
-
-export function addDerivedState(state: State) {
-  const streamMap: Map<StreamID, Node> = new Map();
-  recursiveBuildStreamMap(state.root, streamMap);
-
-  return {
-    ...state,
-    streamMap,
   }
 }
 

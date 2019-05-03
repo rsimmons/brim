@@ -4,20 +4,32 @@ import './ExpressionChooser.css';
 const FLOAT_REGEX = /^[-+]?(?:\d*\.?\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?$/;
 
 function generateChoices(text, environment) {
-  if (FLOAT_REGEX.test(text)) {
-    return [
-      {
-        type: 'number',
-        value: Number(text),
-      }
-    ];
-  } else {
-    return [
-      {
-        type: 'undefined',
-      }
-    ];
+  const choices = [];
+
+  if (environment.nameToNodes.has(text)) {
+    const nodes = environment.nameToNodes.get(text);
+    for (const node of nodes) {
+      choices.push({
+        type: 'streamref',
+        node,
+      })
+    }
   }
+
+  if (FLOAT_REGEX.test(text)) {
+    choices.push({
+      type: 'number',
+      value: Number(text),
+    });
+  }
+
+  if (choices.length === 0) {
+    choices.push({
+      type: 'undefined',
+    });
+  }
+
+  return choices;
 }
 
 function Choice({ choice }) {
@@ -27,6 +39,9 @@ function Choice({ choice }) {
 
     case 'number':
       return <span>{choice.value}</span>
+
+    case 'streamref':
+      return <span>{choice.node.identifier.name} ({choice.node.streamId})</span>
 
     default:
       throw new Error();
@@ -64,6 +79,13 @@ export default function ExpressionChooser({ node, environment, dispatch }) {
         newNode = {
           type: 'IntegerLiteral',
           value: choice.value,
+        };
+        break;
+
+      case 'streamref':
+        newNode = {
+          type: 'StreamReference',
+          targetStreamId: choice.node.streamId,
         };
         break;
 

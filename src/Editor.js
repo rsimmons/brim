@@ -136,8 +136,8 @@ function UndefinedExpressionView({ undefinedExpression }) {
 }
 
 function StreamReferenceView({ streamReference }) {
-  const {streamMap} = useContext(FullStateContext);
-  const targetExpressionNode = streamMap.get(streamReference.targetStreamId);
+  const {streamIdToNode} = useContext(FullStateContext);
+  const targetExpressionNode = streamIdToNode.get(streamReference.targetStreamId);
   if (!targetExpressionNode) {
     throw new Error();
   }
@@ -165,14 +165,18 @@ function NotEditingExpressionView({ expression }) {
 
 function ExpressionView({ expression }) {
   const selected = (expression === useContext(SelectedNodeContext));
-  const {editingSelected} = useContext(FullStateContext);
+  const {editingSelected, nameToNodes} = useContext(FullStateContext);
   const dispatch = useContext(DispatchContext);
+
+  const environment = {
+    nameToNodes,
+  };
 
   return (
     <div className={useWithSelectedClass(expression, 'Editor-expression')}>
       <div className="Editor-expression-main">
         {(selected && editingSelected)
-        ? <ExpressionChooser node={expression} dispatch={dispatch} />
+        ? <ExpressionChooser node={expression} environment={environment} dispatch={dispatch} />
         : <NotEditingExpressionView expression={expression} />
         }
       </div>
@@ -187,6 +191,7 @@ function ExpressionView({ expression }) {
 export default function Editor({ autoFocus }) {
   const [plainState, dispatch] = useReducer(reducer, initialState);
   const state = addDerivedState(plainState);
+  console.log(state);
 
   const editorElem = useRef();
 
