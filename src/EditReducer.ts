@@ -630,26 +630,6 @@ function addDerivedState(state: State): State {
 export function reducer(state: State, action: Action): State {
   console.log('action', action.type);
 
-/*
-  // Some actions are handled specially
-  if (action.type === 'SET_TEXT') {
-    if (!state.textEdit) {
-      throw new Error();
-    }
-    if (typeof(action.text) !== 'string') {
-      throw new Error();
-    }
-
-    return {
-      ...state,
-      textEdit: {
-        ...state.textEdit,
-        text: action.text,
-      }
-    };
-  }
-*/
-
   const recResult = recursiveReducer(state, state.root, action);
   if (recResult) {
     console.log('handled');
