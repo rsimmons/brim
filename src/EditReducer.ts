@@ -253,9 +253,8 @@ const HANDLERS: Handler[] = [
   ['Expression', ['BEGIN_EDIT'], ({node, subpath}) => {
     switch (node.type) {
       case 'IntegerLiteral':
-        return [node, subpath, true];
-
       case 'UndefinedExpression':
+      case 'StreamReference':
         return [node, subpath, true];
 
       case 'ArrayLiteral':
